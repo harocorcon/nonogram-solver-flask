@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nonogram Solver</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <h1>Nonogram Board</h1>
+
+    <div class="game-area">
+
+        <div class="puzzle-wrapper">
+
+            <div class="top-row">
+
+                <div class="corner"></div>
+
+                <div class="column-clues">
+
+                    {% for clue in col_clues %}
+                        
+                        <div class="column-clue">
+
+                            {% for num in clue %}
+                                <span>{{ num }}</span>
+                            {% endfor %}
+
+                        </div>
+                    
+                    {% endfor %}
+
+                </div>
+            </div>
+
+            <div class="bottom-row">
+                <div class="row-clues">
+                    {% for clue in row_clues %}
+                        <div class="row-clue">
+
+                            {% for num in clue %}
+                                <div>{{ num }}</div>
+                            {% endfor %}
+
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="board">
+
+                    {% for row in board %}
+                        {% set row_index = loop.index0 %}
+                        
+                        <div class="row">
+
+                            {% for cell in row %}
+                                <div 
+                                    class="
+                                        cell
+                                        {% if cell == 1 %}
+                                            filled
+                                        {% elif cell == -1 %}
+                                            crossed
+                                        {% endif %}
+                                    "
+                                    data-state="{{ cell }}"
+                                    data-row="{{ row_index }}"
+                                    data-col="{{ loop.index0 }}"
+                                    >
+                                </div>
+                            {% endfor %}
+
+                        </div>
+
+                    {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script >
+        const cells = document.querySelectorAll('.cell');
+
+        cells.forEach(cell => {
+            cell.addEventListener("click", () => {
+                let state = Number(cell.dataset.state);
+                if(state === 0) {
+                    state = 1;
+                } else if(state === 1) {
+                    state = -1;
+                } else {
+                    state = 0;
+                }
+                cell.dataset.state = state;
+
+                updateAppearance(cell, state);
+                
+            });
+        });
+
+        function updateAppearance(cell, state) {
+            cell.classList.remove('filled');
+            cell.classList.remove('crossed');
+
+            if(state === 1) {
+                cell.classList.add('filled');
+            } else if(state === -1) {
+                cell.classList.add('crossed');
+            }
+        }
+    </script>
+
+</body>
+
+</html>

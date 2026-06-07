@@ -1,0 +1,87 @@
+.puzzle-wrapper {
+    display: inline-block;
+}
+
+.top-row{
+    display: flex;
+}
+
+.corner {
+    width: 80px;
+    min-height: 80px;
+    background: yellow;
+}
+
+.column-clues {
+    display: flex;
+    align-items: flex-end;
+    background: lightgreen;
+}
+
+.column-clue {
+    width: 32px;
+    gap: 5px;
+
+    display: flex;
+    flex-direction: column;
+
+    justify-content: flex-end;
+    align-items: center;
+
+    min-height: 80px;
+}
+
+.bottom-row {
+    display: flex;
+}
+
+.row-clues {
+    background: lightblue;
+}
+
+.row-clue {
+    height: 32px;
+    display: flex;
+    gap: 5px;
+    justify-content: flex-end;
+    align-items: center;
+
+    min-width: 80px;
+}
+
+.board {
+    display: flex;
+    flex-direction: column;
+    background: pink;
+}
+
+.row {
+    display: flex;
+}
+
+.cell {
+    width: 30px;
+    height: 30px;
+
+    border: 1px solid black;
+}
+
+.filled {
+    background-color: black;
+}
+
+.crossed {
+    background-color: lightgray;
+    position: relative;
+}
+
+.crossed::before {
+    content: "X";
+
+    position: absolute;
+
+    top: 50%;
+    left: 50%;
+
+    transform: translate(-50%, -50%);
+}
