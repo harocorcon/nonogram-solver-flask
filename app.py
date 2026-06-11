@@ -64,5 +64,15 @@ def home():
 
 board, row_clues, col_clues = load_puzzle()
 
+import subprocess
+
+result = subprocess.run(
+    ["cpp/test.exe"], 
+    capture_output=True, 
+    text=True
+)
+
+print(result.stdout)
+
 if __name__ == "__main__":
     app.run(debug=True)

@@ -21,3 +21,5 @@ instance/
 # OS
 .DS_Store
 Thumbs.db
+
+cpp/test.exe
