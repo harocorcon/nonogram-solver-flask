@@ -93,7 +93,21 @@
                 cell.dataset.state = state;
 
                 updateAppearance(cell, state);
-                
+                fetch('/update-cell', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        row: cell.dataset.row,
+                        col: cell.dataset.col,
+                        state: state
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Server response:', data);
+                });
             });
         });
 

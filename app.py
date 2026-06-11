@@ -1,9 +1,13 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
 app = Flask(__name__)
 UNKNOWN = 0
 FILLED = 1
 CROSSED = -1
+
+board = []
+row_clues = []
+col_clues = []
 
 def load_puzzle():
     with open("puzzle.txt", "r") as f:
@@ -28,25 +32,28 @@ def load_puzzle():
             col_clues.append(clues)
         else:
             board.append([int(x) for x in line.split()])
-    
-
-    # for r in range(rows):
-    #     row = []
-    #     for c in range(cols):
-    #         row.append(0)
-        
-    #     board.append(row)
 
     board[5][2] = CROSSED;  
     return board, row_clues, col_clues
 
+@app.route("/update-cell", methods=["POST"])
+def update_cell():
+    data = request.json
+
+    row= int(data["row"])
+    col = int(data["col"])
+    state = int(data["state"])
+
+    board[row][col] = state
+
+    return {
+        "success": True
+    }
 
 
 @app.route("/")
 
 def home():
-
-    board, row_clues, col_clues = load_puzzle()
 
     return render_template(
         "index.html",
@@ -54,6 +61,8 @@ def home():
         row_clues=row_clues,
         col_clues=col_clues
     )
+
+board, row_clues, col_clues = load_puzzle()
 
 if __name__ == "__main__":
     app.run(debug=True)
