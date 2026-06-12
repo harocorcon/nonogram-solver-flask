@@ -75,6 +75,10 @@
                     {% endfor %}
             </div>
         </div>
+
+        <div>
+            <button class="button" id="clear-button">Clear Board</button>
+        </div>
     </div>
 
     <script >
@@ -110,6 +114,16 @@
                 });
             });
         });
+
+        const clearButton = document.getElementById("clear-button");
+
+        clearButton.addEventListener("click", () => {
+            fetch("/clear")
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+            })
+        })
 
         function updateAppearance(cell, state) {
             cell.classList.remove('filled');

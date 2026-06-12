@@ -36,6 +36,19 @@ def load_puzzle():
     board[5][2] = CROSSED;  
     return board, row_clues, col_clues
 
+@app.route("/clear")
+def clear():
+
+    result = subprocess.run(
+        ["cpp/test.exe"],
+        capture_output=True,
+        text=True
+    )
+    return {
+        "output": result.stdout
+    }
+
+
 @app.route("/update-cell", methods=["POST"])
 def update_cell():
     data = request.json
