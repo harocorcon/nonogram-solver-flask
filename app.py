@@ -56,6 +56,21 @@ def clear():
         "output": board
     }
 
+@app.route("/solve")
+def solve():
+    global board
+    result = subprocess.run(
+        ["cpp/test.exe", "solve"],
+        capture_output=True,
+        text=True
+    )
+
+    board = parse_board(result.stdout)
+    print("xxxx" , str(board))
+    return {
+        "output": board
+    }
+
 @app.route("/update-cell", methods=["POST"])
 def update_cell():
     data = request.json

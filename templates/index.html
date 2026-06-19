@@ -79,6 +79,10 @@
         <div>
             <button class="button" id="clear-button">Clear Board</button>
         </div>
+
+        <div>
+            <button class="button" id="solve-button">Solve Puzzle</button>
+        </div>
     </div>
 
     <script >
@@ -116,6 +120,7 @@
         });
 
         const clearButton = document.getElementById("clear-button");
+        const solveButton = document.getElementById("solve-button");
 
         clearButton.addEventListener("click", () => {
             fetch("/clear")
@@ -123,6 +128,14 @@
             .then(data => {
                 console.log("from /clear:", data);
                 location.reload();  // Reload the page to reflect the cleared board
+            })
+        })
+
+        solveButton.addEventListener("click", () => {
+            fetch("/solve")
+            .then(response => response.json())
+            .then(data => {
+                console.log("from /solve:", data);
             })
         })
 
