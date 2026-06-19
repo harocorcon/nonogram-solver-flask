@@ -1,13 +1,10 @@
 from flask import Flask, render_template, request
+import subprocess
 
 app = Flask(__name__)
 UNKNOWN = 0
 FILLED = 1
 CROSSED = -1
-
-board = []
-row_clues = []
-col_clues = []
 
 def load_puzzle():
     with open("puzzle.txt", "r") as f:
@@ -32,22 +29,32 @@ def load_puzzle():
             col_clues.append(clues)
         else:
             board.append([int(x) for x in line.split()])
-
-    board[5][2] = CROSSED;  
+ 
     return board, row_clues, col_clues
+
+def parse_board(board_str):
+    board = []
+    for line in board_str.strip().split("\n"):
+        row = [int(x) for x in line.split()]
+        board.append(row)
+    return board
+
+board, row_clues, col_clues = load_puzzle()
 
 @app.route("/clear")
 def clear():
-
+    global board
     result = subprocess.run(
         ["cpp/test.exe"],
         capture_output=True,
         text=True
     )
-    return {
-        "output": result.stdout
-    }
 
+    board = parse_board(result.stdout)
+    print("xxxx" , str(board))
+    return {
+        "output": board
+    }
 
 @app.route("/update-cell", methods=["POST"])
 def update_cell():
@@ -65,7 +72,6 @@ def update_cell():
 
 
 @app.route("/")
-
 def home():
 
     return render_template(
@@ -74,18 +80,6 @@ def home():
         row_clues=row_clues,
         col_clues=col_clues
     )
-
-board, row_clues, col_clues = load_puzzle()
-
-import subprocess
-
-result = subprocess.run(
-    ["cpp/test.exe"], 
-    capture_output=True, 
-    text=True
-)
-
-print(result.stdout)
 
 if __name__ == "__main__":
     app.run(debug=True)

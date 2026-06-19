@@ -121,7 +121,8 @@
             fetch("/clear")
             .then(response => response.json())
             .then(data => {
-                console.log(data);
+                console.log("from /clear:", data);
+                location.reload();  // Reload the page to reflect the cleared board
             })
         })
 
