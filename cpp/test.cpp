@@ -20,8 +20,19 @@ void solvePuzzle(int rows, int cols) {
     }
 }
 
-int main() {
-    clearBoard(10, 10);
+int main(int argc, char* argv[]) {
+    std::string action = argv[1];
+    int rows = std::stoi(argv[2]);
+    int cols = std::stoi(argv[3]);
+
+    if(action == "clear") {
+        clearBoard(rows, cols);
+    } else if(action == "solve") {
+        solvePuzzle(rows, cols);
+    } else {
+        std::cerr << "Unknown action: " << action << std::endl;
+        return 1;
+    }   
 
     return 0;
 }

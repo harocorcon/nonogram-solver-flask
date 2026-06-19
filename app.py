@@ -45,7 +45,7 @@ board, row_clues, col_clues = load_puzzle()
 def clear():
     global board
     result = subprocess.run(
-        ["cpp/test.exe"],
+        ["cpp/test.exe", "clear", str(len(board)), str(len(board[0]))],
         capture_output=True,
         text=True
     )
@@ -60,13 +60,12 @@ def clear():
 def solve():
     global board
     result = subprocess.run(
-        ["cpp/test.exe", "solve"],
+        ["cpp/test.exe", "solve", str(len(board)), str(len(board[0]))],
         capture_output=True,
         text=True
     )
 
     board = parse_board(result.stdout)
-    print("xxxx" , str(board))
     return {
         "output": board
     }
