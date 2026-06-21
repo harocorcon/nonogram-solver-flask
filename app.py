@@ -28,11 +28,12 @@ def load_puzzle():
         elif idx < rows + cols:
             col_clues.append(clues)
         else:
-            board.append([int(x) for x in line.split()])
+            row = [int(x) for x in line.split()]
+            row.extend([UNKNOWN] * (cols - len(row)))  # Fill the rest of the row with UNKNOWN if it's shorter than cols
+            board.append(row)
 
-    # if no solution is provided, initialize an empty board
-    if not board:
-        board = [[UNKNOWN for _ in range(cols)] for _ in range(rows)]
+    while len(board) < rows:
+        board.append([UNKNOWN] * cols)
 
     return board, row_clues, col_clues
 
