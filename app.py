@@ -29,7 +29,11 @@ def load_puzzle():
             col_clues.append(clues)
         else:
             board.append([int(x) for x in line.split()])
- 
+
+    # if no solution is provided, initialize an empty board
+    if not board:
+        board = [[UNKNOWN for _ in range(cols)] for _ in range(rows)]
+
     return board, row_clues, col_clues
 
 def parse_board(board_str):
@@ -83,7 +87,6 @@ def update_cell():
     return {
         "success": True
     }
-
 
 @app.route("/")
 def home():
