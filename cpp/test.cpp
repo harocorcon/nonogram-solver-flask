@@ -1,8 +1,18 @@
 #include <iostream>
 #include <vector>
 
-std::vector<std::vector<int>> rowClues;
-std::vector<std::vector<int>> board;
+const int UNKNOWN = 0;
+const int FILLED = 1;
+const int CROSSED = -1;
+
+struct Puzzle {
+    int rows;
+    int cols;
+
+    std::vector<std::vector<int>> rowClues;
+    std::vector<std::vector<int>> colClues;
+    std::vector<std::vector<int>> board;
+};
 
 void clearBoard(int rows, int cols) {
     for(int r = 0; r < rows; r++) {
@@ -24,6 +34,45 @@ void solvePuzzle(int rows, int cols) {
     }
 }
 
+void printBoard(const Puzzle& puzzle)
+{
+    for(const auto& row : puzzle.board)
+    {
+        for(int cell : row)
+        {
+            std::cout << cell << " ";
+        }
+
+        std::cout << "\n";
+    }
+}
+
+void printRowClues(const Puzzle& puzzle)
+{
+    std::cout << "Row Clues:\n";
+    for(const auto& clues : puzzle.rowClues)
+    {
+        for(int clue : clues)
+        {
+            std::cout << clue << " ";
+        }
+        std::cout << "\n";
+    }
+}
+
+void printColumnClues(const Puzzle& puzzle)
+{
+    std::cout << "Column Clues:\n";
+    for(const auto& clues : puzzle.colClues)
+    {
+        for(int clue : clues)
+        {
+            std::cout << clue << " ";
+        }
+        std::cout << "\n";
+    }
+}
+
 int main(int argc, char* argv[]) {
     // std::string action = argv[1];
     // int rows = std::stoi(argv[2]);
@@ -38,19 +87,35 @@ int main(int argc, char* argv[]) {
     //     return 1;
     // }   
 
-    board = {
-    {0, 1, 0},
-    {0, 1, 0},
-    {0, 0, 0}
+    Puzzle puzzle;
+    puzzle.rows = 5;
+    puzzle.cols = 5;
+
+    puzzle.rowClues = {
+        {1},
+        {3},
+        {1,1},
+        {5},
+        {2}
     };
 
+    puzzle.colClues = {
+       {2},
+        {1,1},
+        {3},
+        {1},
+        {2}
+    };
+
+    puzzle.board = std::vector<std::vector<int>>(
+        puzzle.rows,
+        std::vector<int>(puzzle.cols, UNKNOWN)
+    );
+
     std::cout << "Initial board state:\n";
-    for(const auto& row : board) {
-        for(int cell : row) {
-            std::cout << cell << " ";
-        }
-        std::cout << "\n";
-    }
+    printBoard(puzzle);
+    printRowClues(puzzle);
+    printColumnClues(puzzle);
     
     return 0;
 }
