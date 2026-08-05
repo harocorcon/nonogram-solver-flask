@@ -49,30 +49,27 @@ board, row_clues, col_clues = load_puzzle()
 @app.route("/clear")
 def clear():
     global board
-    result = subprocess.run(
-        ["cpp/test.exe", "clear", str(len(board)), str(len(board[0]))],
-        capture_output=True,
-        text=True
-    )
-
-    board = parse_board(result.stdout)
-    print("xxxx" , str(board))
+    
+    board, row_clues, col_clues = load_puzzle()
     return {
-        "output": board
+        "board": board
     }
 
 @app.route("/solve")
 def solve():
-    global board
+    print("/solve here")
+    with open("puzzle.txt", "r") as f:
+        puzzle_text = f.read()
+
     result = subprocess.run(
-        ["cpp/test.exe", "solve", str(len(board)), str(len(board[0]))],
+        ["cpp/test.exe", "solve"],
+        input=puzzle_text,
         capture_output=True,
         text=True
     )
 
-    board = parse_board(result.stdout)
     return {
-        "output": board
+        "output": result.stdout
     }
 
 @app.route("/update-cell", methods=["POST"])

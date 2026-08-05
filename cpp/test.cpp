@@ -1,5 +1,7 @@
 #include <iostream>
 #include <vector>
+#include <sstream>
+#include <string>
 
 const int UNKNOWN = 0;
 const int FILLED = 1;
@@ -14,20 +16,18 @@ struct Puzzle {
     std::vector<std::vector<int>> board;
 };
 
-void clearBoard(int rows, int cols) {
-    for(int r = 0; r < rows; r++) {
-        
-        for(int c = 0; c < cols; c++){
-            std::cout << "0 ";
+void clearBoard(Puzzle &puzzle) {
+    std::cout << "Clearing board of size " << puzzle.rows << "x" << puzzle.cols << "...\n";
+    for(int r = 0; r < puzzle.rows; r++) {
+        for(int c = 0; c < puzzle.cols; c++){
+            puzzle.board[r][c] = UNKNOWN;
         }
-        std::cout << "\n";
     }
 }
 
-void solvePuzzle(int rows, int cols) {
-    for(int r = 0; r < rows; r++) {
-        
-        for(int c = 0; c < cols; c++){
+void solvePuzzle(const Puzzle& puzzle) {
+    for(int r = 0; r < puzzle.rows; r++) {
+        for(int c = 0; c < puzzle.cols; c++){
             std::cout << "1 ";
         }
         std::cout << "\n";
@@ -47,12 +47,14 @@ void printBoard(const Puzzle& puzzle)
     }
 }
 
-void printRowClues(const Puzzle& puzzle)
+void printClues(const Puzzle& puzzle, bool isRowClues)
 {
-    std::cout << "Row Clues:\n";
-    for(const auto& clues : puzzle.rowClues)
+    const auto& clues = isRowClues ? puzzle.rowClues : puzzle.colClues;
+
+    for(int i = 0; i < clues.size(); ++i)
     {
-        for(int clue : clues)
+        std::cout << (isRowClues ? "Row " : "Col ") << i + 1 << ": ";
+        for(int clue : clues[i])
         {
             std::cout << clue << " ";
         }
@@ -73,49 +75,34 @@ void printColumnClues(const Puzzle& puzzle)
     }
 }
 
+void readRowClues(Puzzle& puzzle) {
+    std::string line;
+    for(int r = 0; r < puzzle.rows; ++r) {
+        std::getline(std::cin, line);
+        std::istringstream iss(line);
+        int clue;
+        std::vector<int> clues;
+        while(iss >> clue) {
+            clues.push_back(clue);
+        }
+        puzzle.rowClues.push_back(clues);
+    }
+}
+
 int main(int argc, char* argv[]) {
-    // std::string action = argv[1];
-    // int rows = std::stoi(argv[2]);
-    // int cols = std::stoi(argv[3]);
-
-    // if(action == "clear") {
-    //     clearBoard(rows, cols);
-    // } else if(action == "solve") {
-    //     solvePuzzle(rows, cols);
-    // } else {
-    //     std::cerr << "Unknown action: " << action << std::endl;
-    //     return 1;
-    // }   
-
     Puzzle puzzle;
-    puzzle.rows = 5;
-    puzzle.cols = 5;
-
-    puzzle.rowClues = {
-        {1},
-        {3},
-        {1,1},
-        {5},
-        {2}
-    };
-
-    puzzle.colClues = {
-       {2},
-        {1,1},
-        {3},
-        {1},
-        {2}
-    };
-
-    puzzle.board = std::vector<std::vector<int>>(
-        puzzle.rows,
-        std::vector<int>(puzzle.cols, UNKNOWN)
-    );
-
-    std::cout << "Initial board state:\n";
-    printBoard(puzzle);
-    printRowClues(puzzle);
-    printColumnClues(puzzle);
+    std::string action = argv[1];
+    puzzle.rows = std::stoi(argv[2]);
+    puzzle.cols = std::stoi(argv[3]);
+    puzzle.board.resize(puzzle.rows, std::vector<int>(puzzle.cols, UNKNOWN));
+    
+    if(action == "solve") {
+        solvePuzzle(puzzle);
+    } else {
+        std::cerr << "Unknown action: " << action << std::endl;
+        return 1;
+    }
     
     return 0;
 }
+
