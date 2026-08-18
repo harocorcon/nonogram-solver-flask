@@ -26,12 +26,7 @@ void clearBoard(Puzzle &puzzle) {
 }
 
 void solvePuzzle(const Puzzle& puzzle) {
-    for(int r = 0; r < puzzle.rows; r++) {
-        for(int c = 0; c < puzzle.cols; c++){
-            std::cout << "1 ";
-        }
-        std::cout << "\n";
-    }
+    std::cout << "Solving puzzle of size " << puzzle.rows << "x" << puzzle.cols << "...\n";
 }
 
 void printBoard(const Puzzle& puzzle)
@@ -89,19 +84,72 @@ void readRowClues(Puzzle& puzzle) {
     }
 }
 
+Puzzle readPuzzle(int rows, int cols) {
+    Puzzle puzzle;
+    puzzle.rows = rows;
+    puzzle.cols = cols;
+    puzzle.board.resize(rows, std::vector<int>(cols, UNKNOWN));
+
+    std::string line;
+    std::getline(std::cin, line);
+    
+    for (int r = 0; r < rows; r++){
+        std::getline(std::cin, line);
+
+        std::stringstream ss(line);
+
+        std::vector<int> clue;
+
+        int value;
+
+        while (ss >> value)
+        {
+            clue.push_back(value);
+        }
+
+        puzzle.rowClues.push_back(clue);
+    }
+
+    for (int c = 0; c < cols; c++) {
+        std::string line;
+        std::getline(std::cin, line);
+
+        std::stringstream ss(line);
+
+        std::vector<int> clue;
+
+        int value;
+
+        while (ss >> value)
+        {
+            clue.push_back(value);
+        }
+
+        puzzle.colClues.push_back(clue);
+    }
+    
+    return puzzle;
+}
+
+
 int main(int argc, char* argv[]) {
     Puzzle puzzle;
     std::string action = argv[1];
     puzzle.rows = std::stoi(argv[2]);
     puzzle.cols = std::stoi(argv[3]);
-    puzzle.board.resize(puzzle.rows, std::vector<int>(puzzle.cols, UNKNOWN));
-    
+
+    puzzle = readPuzzle(puzzle.rows, puzzle.cols);
+    printClues(puzzle, true);
+    printClues(puzzle, false);
+
     if(action == "solve") {
         solvePuzzle(puzzle);
     } else {
         std::cerr << "Unknown action: " << action << std::endl;
         return 1;
     }
+
+    printBoard(puzzle);
     
     return 0;
 }
