@@ -48,9 +48,10 @@ board, row_clues, col_clues = load_puzzle()
 
 @app.route("/clear")
 def clear():
-    global board
-    
+    global board, row_clues, col_clues
+
     board, row_clues, col_clues = load_puzzle()
+
     return {
         "board": board
     }
@@ -75,8 +76,10 @@ def solve():
         text=True 
     )
 
+    new_board = parse_board(result.stdout)
+
     return {
-        "output": result.stdout
+        "board": new_board
     }
 
 @app.route("/update-cell", methods=["POST"])

@@ -126,8 +126,7 @@
             fetch("/clear")
             .then(response => response.json())
             .then(data => {
-                console.log("from /clear:", data);
-                // location.reload();  // Reload the page to reflect the cleared board
+                updateBoard(data.board);
             })
         })
 
@@ -135,8 +134,7 @@
             fetch("/solve")
             .then(response => response.json())
             .then(data => {
-                console.log("from /solve:", data);
-                // location.reload();  // Reload the page to reflect the solved board
+                updateBoard(data.board);
             })
         })
 
@@ -149,6 +147,16 @@
             } else if(state === -1) {
                 cell.classList.add('crossed');
             }
+        }
+
+        function updateBoard(newBoard) {
+            cells.forEach(cell => {
+                const row = Number(cell.dataset.row);
+                const col = Number(cell.dataset.col);
+                const newState = newBoard[row][col];
+                cell.dataset.state = newState;
+                updateAppearance(cell, newState);
+            });
         }
     </script>
 

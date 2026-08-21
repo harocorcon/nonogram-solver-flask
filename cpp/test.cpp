@@ -25,8 +25,14 @@ void clearBoard(Puzzle &puzzle) {
     }
 }
 
-void solvePuzzle(const Puzzle& puzzle) {
-    std::cout << "Solving puzzle of size " << puzzle.rows << "x" << puzzle.cols << "...\n";
+void solvePuzzle(Puzzle& puzzle) {
+    for (int r = 0; r < puzzle.rows; r++)
+    {
+        for (int c = 0; c < puzzle.cols; c++)
+        {
+            puzzle.board[r][c] = FILLED;
+        }
+    }
 }
 
 void printBoard(const Puzzle& puzzle)
@@ -127,20 +133,22 @@ Puzzle readPuzzle(int rows, int cols) {
 
         puzzle.colClues.push_back(clue);
     }
+
+    puzzle.board = std::vector<std::vector<int>>(
+        puzzle.rows,
+        std::vector<int>(puzzle.cols, UNKNOWN)
+    );   
     
     return puzzle;
 }
 
 
 int main(int argc, char* argv[]) {
-    Puzzle puzzle;
     std::string action = argv[1];
-    puzzle.rows = std::stoi(argv[2]);
-    puzzle.cols = std::stoi(argv[3]);
+    int rows = std::stoi(argv[2]);
+    int cols = std::stoi(argv[3]);
 
-    puzzle = readPuzzle(puzzle.rows, puzzle.cols);
-    printClues(puzzle, true);
-    printClues(puzzle, false);
+    Puzzle puzzle = readPuzzle(rows, cols);
 
     if(action == "solve") {
         solvePuzzle(puzzle);
