@@ -25,6 +25,30 @@ void clearBoard(Puzzle &puzzle) {
     }
 }
 
+std::vector<std::vector<int>> generatePatterns(
+    int length,
+    const std::vector<int>& clues
+)
+{
+    std::vector<std::vector<int>> patterns;
+    // Implementation for generating patterns
+    int blockSize = clues[0];
+
+    int numberOfPositions = length - blockSize + 1;
+
+    for(int start = 0; start < numberOfPositions; start++) {
+        std::vector<int> pattern(length, UNKNOWN);
+
+        for(int i = 0; i < blockSize; i++) {
+            pattern[start + i] = FILLED;
+        }
+
+        patterns.push_back(pattern);
+    }
+
+    return patterns;
+}
+
 void solvePuzzle(Puzzle& puzzle) {
     for (int r = 0; r < puzzle.rows; r++)
     {
@@ -32,6 +56,17 @@ void solvePuzzle(Puzzle& puzzle) {
         {
             puzzle.board[r][c] = FILLED;
         }
+    }
+
+    std::vector<int> clue = {3};
+
+    std::vector<std::vector<int>> patterns = generatePatterns(5, clue);
+
+    for(const auto& pattern : patterns) {
+        for (int cell : pattern) {
+            std::cerr << cell << " ";
+        }
+        std::cerr << "\n";
     }
 }
 
@@ -45,48 +80,6 @@ void printBoard(const Puzzle& puzzle)
         }
 
         std::cout << "\n";
-    }
-}
-
-void printClues(const Puzzle& puzzle, bool isRowClues)
-{
-    const auto& clues = isRowClues ? puzzle.rowClues : puzzle.colClues;
-
-    for(int i = 0; i < clues.size(); ++i)
-    {
-        std::cout << (isRowClues ? "Row " : "Col ") << i + 1 << ": ";
-        for(int clue : clues[i])
-        {
-            std::cout << clue << " ";
-        }
-        std::cout << "\n";
-    }
-}
-
-void printColumnClues(const Puzzle& puzzle)
-{
-    std::cout << "Column Clues:\n";
-    for(const auto& clues : puzzle.colClues)
-    {
-        for(int clue : clues)
-        {
-            std::cout << clue << " ";
-        }
-        std::cout << "\n";
-    }
-}
-
-void readRowClues(Puzzle& puzzle) {
-    std::string line;
-    for(int r = 0; r < puzzle.rows; ++r) {
-        std::getline(std::cin, line);
-        std::istringstream iss(line);
-        int clue;
-        std::vector<int> clues;
-        while(iss >> clue) {
-            clues.push_back(clue);
-        }
-        puzzle.rowClues.push_back(clues);
     }
 }
 

@@ -77,6 +77,7 @@ def solve():
     )
 
     new_board = parse_board(result.stdout)
+    print(result.stderr)
 
     return {
         "board": new_board
