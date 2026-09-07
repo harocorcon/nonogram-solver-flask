@@ -25,29 +25,71 @@ void clearBoard(Puzzle &puzzle) {
     }
 }
 
+int minimumSpaceRequired(const std::vector<int>& clues, int clueIndex) {
+    int space = 0;
+
+    for(int i = clueIndex; i < clues.size(); i++){
+        space += clues[i];
+    }
+
+    // one gap between every remaining pair of clues
+    int remainingClues = clues.size() - clueIndex;
+    space += remainingClues - 1;
+
+    return space;
+
+}
+
+void generatePatternsRecursive(
+    int length,
+    const std::vector<int>& clues,
+    int clueIndex,
+    int position,
+    std::vector<int>& currentPattern,
+    std::vector<std::vector<int>>& patterns
+) {
+    // Base case: if all clues have been placed
+    if(clueIndex == clues.size()) {
+        patterns.push_back(currentPattern);
+        return;
+    }
+
+    int blockSize = clues[clueIndex];
+
+    // Try placing this block at every possible position
+    int minSpace = minimumSpaceRequired(clues, clueIndex);
+    for(int start = position; start <= length - minSpace; start++) {
+        // make sure the block fits with enough room for the remaining clues
+        for( int i = 0; i < blockSize; i++) {
+            currentPattern[start + i] = FILLED;
+        }
+        // move past this block and leave one empty cell
+        int nextPosition = start + blockSize + 1;
+
+        generatePatternsRecursive(length, clues, clueIndex + 1, nextPosition, currentPattern, patterns);
+
+        // undo the placement
+        for(int i = 0; i < blockSize; i++) {
+            currentPattern[start + i] = UNKNOWN;
+        }
+    }
+}
+
 std::vector<std::vector<int>> generatePatterns(
     int length,
     const std::vector<int>& clues
 )
 {
     std::vector<std::vector<int>> patterns;
-    // Implementation for generating patterns
-    int blockSize = clues[0];
+    
+    std::vector<int> currentPattern(length, UNKNOWN);
 
-    int numberOfPositions = length - blockSize + 1;
-
-    for(int start = 0; start < numberOfPositions; start++) {
-        std::vector<int> pattern(length, UNKNOWN);
-
-        for(int i = 0; i < blockSize; i++) {
-            pattern[start + i] = FILLED;
-        }
-
-        patterns.push_back(pattern);
-    }
+    generatePatternsRecursive(length, clues, 0, 0, currentPattern, patterns);
 
     return patterns;
 }
+
+
 
 void solvePuzzle(Puzzle& puzzle) {
     for (int r = 0; r < puzzle.rows; r++)
@@ -58,13 +100,13 @@ void solvePuzzle(Puzzle& puzzle) {
         }
     }
 
-    std::vector<int> clue = {3};
+    std::vector<int> clues = {1, 2, 2};
 
-    std::vector<std::vector<int>> patterns = generatePatterns(5, clue);
+    std::vector<std::vector<int>> patterns = generatePatterns(7, clues);
 
     for(const auto& pattern : patterns) {
         for (int cell : pattern) {
-            std::cerr << cell << " ";
+            std::cerr << cell << "-";
         }
         std::cerr << "\n";
     }
