@@ -14,6 +14,12 @@ struct Puzzle {
     std::vector<std::vector<int>> rowClues;
     std::vector<std::vector<int>> colClues;
     std::vector<std::vector<int>> board;
+
+    std::vector<std::vector<std::vector<int>>> rowPatterns;  // [row][patternIndex][cell]   
+    std::vector<std::vector<std::vector<int>>> colPatterns;  // [col][patternIndex][cell]   
+
+    std::vector<int> rowPatternCounts;
+    std::vector<int> colPatternCounts;
 };
 
 void clearBoard(Puzzle &puzzle) {
@@ -100,9 +106,9 @@ void solvePuzzle(Puzzle& puzzle) {
         }
     }
 
-    std::vector<int> clues = {1, 2, 2};
+    std::vector<int> clues = {2, 1};
 
-    std::vector<std::vector<int>> patterns = generatePatterns(7, clues);
+    std::vector<std::vector<int>> patterns = generatePatterns(5, clues);
 
     for(const auto& pattern : patterns) {
         for (int cell : pattern) {
@@ -110,6 +116,7 @@ void solvePuzzle(Puzzle& puzzle) {
         }
         std::cerr << "\n";
     }
+
 }
 
 void printBoard(const Puzzle& puzzle)
@@ -177,6 +184,76 @@ Puzzle readPuzzle(int rows, int cols) {
     return puzzle;
 }
 
+bool matchesBoard (std::vector<std::vector<int>> board, std::vector<std::vector<int>> pattern) {
+    // only patterns compatible with the current board
+    
+    return true;
+}
+
+void testGenerateAllPatterns() {
+    Puzzle puzzle;
+    puzzle.rows = 5;
+    puzzle.cols = 5;
+    puzzle.board = std::vector<std::vector<int>>(puzzle.rows, std::vector<int>(puzzle.cols, UNKNOWN));
+
+    puzzle.rowClues = {
+        {2, 1},
+        {1, 1, 1},
+        {3, 1},
+        {1, 2},
+        {5}
+    };
+    puzzle.colClues = {
+        {3, 1},
+        {1, 2},
+        {2, 1},
+        {3},
+        {2, 1}
+    };
+
+    std::cout << "Testing pattern generation " << std::endl;
+    puzzle.rowPatterns.resize(puzzle.rows);
+    for(int r = 0; r < puzzle.rows; r++) {
+        puzzle.rowPatterns[r] = generatePatterns(puzzle.cols, puzzle.rowClues[r]);
+        std::cout << "Row " << r << " patterns: " << puzzle.rowPatterns[r].size() << std::endl;
+        for(int c : puzzle.rowClues[r]) {
+            std::cout << c << " ";
+        }
+        std::cout << "-> " << puzzle.rowPatterns[r].size() << " patterns:" << std::endl;
+    
+        for(const auto& pattern : puzzle.rowPatterns[r]) {
+            std::cout << " ";
+            for(int cell : pattern) {
+                if(cell == FILLED) {
+                    std::cout << "#";
+                } else {
+                    std::cout << ".";
+                }
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    std::cout << std::endl;
+    
+    // Columns
+    puzzle.colPatterns.resize(puzzle.cols);
+    for (int c = 0; c < puzzle.cols; c++) {
+        puzzle.colPatterns[c] = generatePatterns(puzzle.rows, puzzle.colClues[c]);
+        std::cout << "Col " << c << " clues: ";
+        for (int r : puzzle.colClues[c]) std::cout << r << " ";
+        std::cout << "-> " << puzzle.colPatterns[c].size() << " patterns:" << std::endl;
+        for (const auto& p : puzzle.colPatterns[c]) {
+            std::cout << "  ";
+            for (int cell : p) {
+                if (cell == FILLED) std::cout << "#";
+                else std::cout << ".";
+            }
+            std::cout << std::endl;
+        }
+    }
+}
+
 
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
@@ -184,9 +261,10 @@ int main(int argc, char* argv[]) {
     int cols = std::stoi(argv[3]);
 
     Puzzle puzzle = readPuzzle(rows, cols);
-
+    
     if(action == "solve") {
-        solvePuzzle(puzzle);
+        // solvePuzzle(puzzle);
+        testGenerateAllPatterns();
     } else {
         std::cerr << "Unknown action: " << action << std::endl;
         return 1;
