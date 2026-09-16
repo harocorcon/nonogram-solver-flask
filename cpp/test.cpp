@@ -33,6 +33,26 @@ uint32_t patternToMask(const std::vector<int>& pattern) {
     return mask;
 }
 
+uint32_t computeAndMask(const std::vector<uint32_t>& patterns) {
+    if(patterns.empty()) return 0;
+
+    uint32_t result = patterns[0];
+    for(int i = 1; i < patterns.size(); i++) {
+        result &= patterns[i];
+    }
+    return result;
+}
+
+uint32_t computeOrMask(const std::vector<uint32_t>& patterns) {
+    if (patterns.empty()) return 0xFFFFFFFF;
+
+    uint32_t result = patterns[0];
+    for(int i = 1; i < patterns.size(); i++) {
+        result |= patterns[i];
+    }
+    return result;
+}
+
 void clearBoard(Puzzle &puzzle) {
     std::cout << "Clearing board of size " << puzzle.rows << "x" << puzzle.cols << "...\n";
     for(int r = 0; r < puzzle.rows; r++) {
@@ -264,6 +284,7 @@ void testGenerateAllPatterns() {
             std::cerr << std::endl;
         }
     }
+
 }
 
 void testBitmask() {
@@ -279,6 +300,35 @@ void testBitmask() {
     std::cerr << "Bitmask: " << mask << std::endl;
 }
 
+void testMasks() {
+    std::cerr << "Testing AND/OR mask computation..." << std::endl;
+    std::cerr << "Patterns for {3} in 5 cells:" << std::endl;
+
+    auto patterns = generatePatterns(8, {5});
+
+    std::vector<uint32_t> masks;
+    for (const auto& p : patterns) {
+        uint32_t m = patternToMask(p);
+        masks.push_back(m);
+
+        std::cerr << "Pattern: ";
+        for (int cell : p) std::cerr << (cell == FILLED ? "#" : ".");
+        std::cerr << " -> Mask: " << m << " BINARY: ";
+        for (int i = 0; i < 9; i ++) std::cerr << ((m >> i) & 1);
+        std::cerr << ")" <<std::endl;
+    }
+
+    uint32_t andMask = computeAndMask(masks);
+    uint32_t orMask = computeOrMask(masks);
+
+    std::cerr << "AND Mask: " << andMask << " BINARY: ";
+    for (int i = 0; i < 9; i ++) std::cerr << ((andMask >> i) & 1);
+    std::cerr << std::endl;
+    std::cerr << "OR Mask: " << orMask << " BINARY: ";
+    for (int i = 0; i < 9; i ++) std::cerr << ((orMask >> i) & 1);
+    std::cerr << std::endl;
+}
+
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
     int rows = std::stoi(argv[2]);
@@ -290,6 +340,7 @@ int main(int argc, char* argv[]) {
         // solvePuzzle(puzzle);
         testGenerateAllPatterns();
         testBitmask();
+        testMasks();
     } else {
         std::cerr << "Unknown action: " << action << std::endl;
         return 1;
