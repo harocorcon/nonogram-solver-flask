@@ -2,6 +2,7 @@
 #include <vector>
 #include <sstream>
 #include <string>
+#include <cstdint>
 
 const int UNKNOWN = 0;
 const int FILLED = 1;
@@ -21,6 +22,16 @@ struct Puzzle {
     std::vector<int> rowPatternCounts;
     std::vector<int> colPatternCounts;
 };
+
+uint32_t patternToMask(const std::vector<int>& pattern) {
+    uint32_t mask = 0;
+    for(int i = 0; i < pattern.size() && i < 32; i++) {
+        if(pattern[i] == FILLED) {
+            mask |= (1 << i);
+        }
+    }
+    return mask;
+}
 
 void clearBoard(Puzzle &puzzle) {
     std::cout << "Clearing board of size " << puzzle.rows << "x" << puzzle.cols << "...\n";
@@ -184,76 +195,89 @@ Puzzle readPuzzle(int rows, int cols) {
     return puzzle;
 }
 
-bool matchesBoard (std::vector<std::vector<int>> board, std::vector<std::vector<int>> pattern) {
-    // only patterns compatible with the current board
-    
-    return true;
-}
-
 void testGenerateAllPatterns() {
     Puzzle puzzle;
-    puzzle.rows = 5;
-    puzzle.cols = 5;
+    puzzle.rows = 8;
+    puzzle.cols = 8;
     puzzle.board = std::vector<std::vector<int>>(puzzle.rows, std::vector<int>(puzzle.cols, UNKNOWN));
 
     puzzle.rowClues = {
-        {2, 1},
-        {1, 1, 1},
+        {3},
+        {1, 4, 1},
         {3, 1},
         {1, 2},
-        {5}
+        {5, 2},
+        {3, 2, 1},
+        {8},
+        {3, 3}
     };
     puzzle.colClues = {
         {3, 1},
         {1, 2},
         {2, 1},
         {3},
+        {1, 4, 1},
+        {3, 1},
+        {1, 2},
+        {5, 2},
         {2, 1}
     };
 
-    std::cout << "Testing pattern generation " << std::endl;
+    std::cerr << "Testing pattern generation " << std::endl;
     puzzle.rowPatterns.resize(puzzle.rows);
     for(int r = 0; r < puzzle.rows; r++) {
         puzzle.rowPatterns[r] = generatePatterns(puzzle.cols, puzzle.rowClues[r]);
-        std::cout << "Row " << r << " patterns: " << puzzle.rowPatterns[r].size() << std::endl;
+        std::cerr << "Row " << r << " patterns: " << puzzle.rowPatterns[r].size() << std::endl;
         for(int c : puzzle.rowClues[r]) {
-            std::cout << c << " ";
+            std::cerr << c << " ";
         }
-        std::cout << "-> " << puzzle.rowPatterns[r].size() << " patterns:" << std::endl;
+        std::cerr << "-> " << puzzle.rowPatterns[r].size() << " patterns:" << std::endl;
     
         for(const auto& pattern : puzzle.rowPatterns[r]) {
-            std::cout << " ";
+            std::cerr << " ";
             for(int cell : pattern) {
                 if(cell == FILLED) {
-                    std::cout << "#";
+                    std::cerr << "#";
                 } else {
-                    std::cout << ".";
+                    std::cerr << ".";
                 }
             }
-            std::cout << std::endl;
+            std::cerr << std::endl;
         }
     }
 
-    std::cout << std::endl;
+    std::cerr << std::endl;
     
     // Columns
     puzzle.colPatterns.resize(puzzle.cols);
     for (int c = 0; c < puzzle.cols; c++) {
         puzzle.colPatterns[c] = generatePatterns(puzzle.rows, puzzle.colClues[c]);
-        std::cout << "Col " << c << " clues: ";
-        for (int r : puzzle.colClues[c]) std::cout << r << " ";
-        std::cout << "-> " << puzzle.colPatterns[c].size() << " patterns:" << std::endl;
+        std::cerr << "Col " << c << " clues: ";
+        for (int r : puzzle.colClues[c]) std::cerr << r << " ";
+        std::cerr << "-> " << puzzle.colPatterns[c].size() << " patterns:" << std::endl;
         for (const auto& p : puzzle.colPatterns[c]) {
-            std::cout << "  ";
+            std::cerr << "  ";
             for (int cell : p) {
-                if (cell == FILLED) std::cout << "#";
-                else std::cout << ".";
+                if (cell == FILLED) std::cerr << "#";
+                else std::cerr << ".";
             }
-            std::cout << std::endl;
+            std::cerr << std::endl;
         }
     }
 }
 
+void testBitmask() {
+    std::cerr << "Testing bitmask conversion..." << std::endl;
+    std::vector<int> pattern = {UNKNOWN, FILLED, UNKNOWN, FILLED, UNKNOWN, FILLED, FILLED, UNKNOWN, FILLED};
+    uint32_t mask = patternToMask(pattern);
+    
+    std::cerr << "Pattern: ";
+    for (int cell : pattern) {
+        std::cerr << (cell == FILLED ? "#" : ".");
+    }
+    std::cerr << std::endl;
+    std::cerr << "Bitmask: " << mask << std::endl;
+}
 
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
@@ -265,6 +289,7 @@ int main(int argc, char* argv[]) {
     if(action == "solve") {
         // solvePuzzle(puzzle);
         testGenerateAllPatterns();
+        testBitmask();
     } else {
         std::cerr << "Unknown action: " << action << std::endl;
         return 1;
