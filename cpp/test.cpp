@@ -8,6 +8,11 @@ const int UNKNOWN = 0;
 const int FILLED = 1;
 const int CROSSED = -1;
 
+struct Domain {
+    std::vector<int> patternIndeces; // possible patterns
+    uint32_t andMask; // AND of all patterns
+    uint32_t orMask;  // OR of all patterns
+};
 struct Puzzle {
     int rows;
     int cols;
@@ -21,6 +26,11 @@ struct Puzzle {
 
     std::vector<int> rowPatternCounts;
     std::vector<int> colPatternCounts;
+
+    std::vector<std::vector<uint32_t>> rowPatternMasks;
+    std::vector<std::vector<uint32_t>> colPatternMasks;
+    std::vector<Domain> rowDomains; 
+    std::vector<Domain> colDomains;
 };
 
 uint32_t patternToMask(const std::vector<int>& pattern) {
@@ -329,6 +339,118 @@ void testMasks() {
     std::cerr << std::endl;
 }
 
+void initializeDomains(Puzzle& puzzle) { 
+    puzzle.rowDomains.resize(puzzle.rows);
+    puzzle.colDomains.resize(puzzle.cols);
+
+    // intialize row domains
+    for (int r = 0; r < puzzle.rows; r++) {
+        Domain& d = puzzle.rowDomains[r];
+
+        // All pattern indeces are initally possible
+        d.patternIndeces.resize(puzzle.rowPatternMasks[r].size());
+        for( int i = 0; i < d.patternIndeces.size(); i++) {
+            d.patternIndeces[i] = i;
+        }
+
+        d.andMask = computeAndMask(puzzle.rowPatternMasks[r]);
+        d.orMask = computeOrMask(puzzle.rowPatternMasks[r]);
+    }
+
+    // initialize column domains
+    for( int c= 0; c < puzzle.cols; c++) {
+        Domain& d = puzzle.colDomains[c];
+
+        d.patternIndeces.resize(puzzle.colPatternMasks[c].size());
+        for(int i = 0; i < d.patternIndeces.size(); i++) {
+            d.patternIndeces[i] = i;
+        }
+
+        d.andMask = computeAndMask(puzzle.colPatternMasks[c]);
+        d.orMask = computeOrMask(puzzle.colPatternMasks[c]);
+    }
+}
+
+void testInitializeDomains() {
+    Puzzle puzzle;
+    puzzle.rows = 5;
+    puzzle.cols = 5;
+    puzzle.rowClues = {
+        {3},
+        {1, 3},
+        {5},
+        {1, 1},
+        {3}
+    };
+    puzzle.colClues = {
+        {3},
+        {1, 1},
+        {5},
+        {2, 2},
+        {3}
+    };
+    puzzle.board = std::vector<std::vector<int>>(puzzle.rows, std::vector<int>(puzzle.cols, UNKNOWN));
+
+    // generate patterns
+    puzzle.rowPatterns.resize(puzzle.rows);
+    puzzle.rowPatternMasks.resize(puzzle.rows);
+    for(int r = 0; r < puzzle.rows; r++) {
+        puzzle.rowPatterns[r] = generatePatterns(puzzle.cols, puzzle.rowClues[r]);
+        puzzle.rowPatternMasks[r].resize(puzzle.rowPatterns[r].size());
+        for(int i = 0; i < puzzle.rowPatterns[r].size(); i++) {
+            puzzle.rowPatternMasks[r][i] = patternToMask(puzzle.rowPatterns[r][i]);
+        }
+    }
+
+    puzzle.colPatterns.resize(puzzle.cols);
+    puzzle.colPatternMasks.resize(puzzle.cols);
+    for (int c = 0; c < puzzle.cols; c++ ) {
+        puzzle.colPatterns[c] = generatePatterns(puzzle.rows, puzzle.colClues[c]);
+        for( const auto& p : puzzle.colPatterns[c]) {
+            puzzle.colPatternMasks[c].push_back(patternToMask(p));
+        }
+    }
+
+    // Intialize domains
+    initializeDomains(puzzle);
+
+    // Print Domains
+    std::cerr << "Initial Domains" << std::endl;
+    for (int r = 0; r < puzzle.rows; r++) {
+        std::cerr   << "Row " << r
+                    << " | patterns: "
+                    << puzzle.rowDomains[r].patternIndeces.size()
+                    << " | AND = ";
+
+        for(int i = 0; i < puzzle.cols; i++) {
+            std::cerr << ((puzzle.rowDomains[r].andMask >> i) & 1);
+        }
+        std::cerr << " | OR = ";
+        for(int i = 0; i < puzzle.cols; i++) {
+            std::cerr << ((puzzle.rowDomains[r].orMask >> i) & 1);
+        }
+        std::cerr << std::endl;
+    }
+
+    for (int c = 0; c < puzzle.cols; c++) {
+        std::cerr   << "Col " << c
+                    << " | patterns: "
+                    << puzzle.colDomains[c].patternIndeces.size()
+                    << " | AND = ";
+
+        for(int i = 0; i < puzzle.rows; i++) {
+            std::cerr << ((puzzle.colDomains[c].andMask >> i) & 1);
+        }
+        std::cerr << " | OR = ";
+        for(int i = 0; i < puzzle.rows; i++) {
+            std::cerr << ((puzzle.colDomains[c].orMask >> i) & 1);
+        }
+        std::cerr << std::endl;
+    }
+
+
+}
+
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
     int rows = std::stoi(argv[2]);
@@ -338,9 +460,10 @@ int main(int argc, char* argv[]) {
     
     if(action == "solve") {
         // solvePuzzle(puzzle);
-        testGenerateAllPatterns();
-        testBitmask();
-        testMasks();
+        // testGenerateAllPatterns();
+        // testBitmask();
+        // testMasks();
+        testInitializeDomains();
     } else {
         std::cerr << "Unknown action: " << action << std::endl;
         return 1;
