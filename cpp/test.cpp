@@ -348,7 +348,7 @@ void initializeDomains(Puzzle& puzzle) {
         Domain& d = puzzle.rowDomains[r];
 
         // All pattern indeces are initally possible
-        d.patternIndeces.resize(puzzle.rowPatternMasks[r].size());
+        d.patternIndeces.resize(puzzle.rowPatterns[r].size());
         for( int i = 0; i < d.patternIndeces.size(); i++) {
             d.patternIndeces[i] = i;
         }
@@ -361,7 +361,7 @@ void initializeDomains(Puzzle& puzzle) {
     for( int c= 0; c < puzzle.cols; c++) {
         Domain& d = puzzle.colDomains[c];
 
-        d.patternIndeces.resize(puzzle.colPatternMasks[c].size());
+        d.patternIndeces.resize(puzzle.colPatterns[c].size());
         for(int i = 0; i < d.patternIndeces.size(); i++) {
             d.patternIndeces[i] = i;
         }
@@ -397,8 +397,9 @@ void testInitializeDomains() {
     for(int r = 0; r < puzzle.rows; r++) {
         puzzle.rowPatterns[r] = generatePatterns(puzzle.cols, puzzle.rowClues[r]);
         puzzle.rowPatternMasks[r].resize(puzzle.rowPatterns[r].size());
-        for(int i = 0; i < puzzle.rowPatterns[r].size(); i++) {
-            puzzle.rowPatternMasks[r][i] = patternToMask(puzzle.rowPatterns[r][i]);
+        puzzle.rowPatternMasks[r].clear();
+        for( const auto& p : puzzle.rowPatterns[r]) {
+            puzzle.rowPatternMasks[r].push_back(patternToMask(p));
         }
     }
 
@@ -406,6 +407,8 @@ void testInitializeDomains() {
     puzzle.colPatternMasks.resize(puzzle.cols);
     for (int c = 0; c < puzzle.cols; c++ ) {
         puzzle.colPatterns[c] = generatePatterns(puzzle.rows, puzzle.colClues[c]);
+        puzzle.colPatternMasks[c].resize(puzzle.colPatterns[c].size());
+        puzzle.colPatternMasks[c].clear();
         for( const auto& p : puzzle.colPatterns[c]) {
             puzzle.colPatternMasks[c].push_back(patternToMask(p));
         }
@@ -448,6 +451,30 @@ void testInitializeDomains() {
         std::cerr << std::endl;
     }
 
+    std::cerr << "\n=== Direct call: generatePatterns(5, {1,1}) ===" << std::endl;
+    auto directPatterns = generatePatterns(5, {1, 1});
+    std::cerr << "Count: " << directPatterns.size() << std::endl;
+    for (const auto& p : directPatterns) {
+        std::cerr << "  ";
+        for (int cell : p) std::cerr << (cell == FILLED ? "#" : ".");
+        std::cerr << std::endl;
+    }
+
+    // Now what's stored in puzzle.rowPatterns[3]
+    std::cerr << "\n=== puzzle.rowPatterns[3] (" << puzzle.rowPatterns[3].size() << " entries) ===" << std::endl;
+    for (int i = 0; i < puzzle.rowPatterns[3].size(); i++) {
+        std::cerr << "  [" << i << "] ";
+        for (int cell : puzzle.rowPatterns[3][i]) std::cerr << (cell == FILLED ? "#" : ".");
+        std::cerr << std::endl;
+    }
+
+    // And colPatterns[1]
+    std::cerr << "\n=== puzzle.colPatterns[1] (" << puzzle.colPatterns[1].size() << " entries) ===" << std::endl;
+    for (int i = 0; i < puzzle.colPatterns[1].size(); i++) {
+        std::cerr << "  [" << i << "] ";
+        for (int cell : puzzle.colPatterns[1][i]) std::cerr << (cell == FILLED ? "#" : ".");
+        std::cerr << std::endl;
+    }
 
 }
 
