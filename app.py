@@ -62,9 +62,9 @@ def solve():
     with open("puzzle.txt", "r") as f:
         puzzle_text = f.read()
 
-    print("PUZZLE TEXT:")
-    print(puzzle_text)
-    print("NUMBER OF LINES:", len(puzzle_text.splitlines()))
+    # print("PUZZLE TEXT:")
+    # print(puzzle_text)
+    # print("NUMBER OF LINES:", len(puzzle_text.splitlines()))
     
     result = subprocess.run(
         ["cpp/test.exe", 

@@ -478,19 +478,178 @@ void testInitializeDomains() {
 
 }
 
+// From paper SECTION 3.4
+// "These two tuples are used to filter the domains of intersecting
+// row/column variables"
+void filterRowPatterns(Puzzle& puzzle, int row) {
+    std::cerr << "Filtering row patterns for row " << row << "domain size = " << puzzle.rowDomains[row].patternIndeces.size() << " -- " << std::endl;
+    
+    std::vector<int> newDomain;
+
+    for (int patternIndex : puzzle.rowDomains[row].patternIndeces) {
+        uint32_t rowMask = puzzle.rowPatternMasks[row][patternIndex];
+        bool valid = true;
+        int rejectCol = -1;
+        const char* reason = "";
+
+        for(int c = 0; c < puzzle.cols; c++) {
+            // check 1: column guarantees FILLED at this row
+            if (puzzle.colDomains[c].andMask & (1u << row)) {
+                if (!(rowMask & (1u << c))) {
+                    valid = false;
+                    rejectCol = c;
+                    reason = "Column guarantees FILLED but pattern is EMPTY";
+                    break;
+                }
+            }
+            // check 2: column guarantees EMPTY at this row
+            // OR-tuple convention: bit = 0 guarantees EMPTY
+            if (!(puzzle.colDomains[c].orMask & (1u << row))) {
+                if (rowMask & (1u << c)) {
+                    valid = false;
+                    rejectCol = c;
+                    reason = "Column guarantees EMPTY but pattern is FILLED";
+                    break;
+                }
+            }
+        }
+
+        std::cerr << "\npattern " << patternIndex << "[";
+        for(int c = 0; c < puzzle.cols; c++)
+            std::cerr << ((rowMask >> c) & 1);
+        std::cerr << "] -> " << (valid ? "KEEP" : "REJECT");
+        if(!valid)
+            std::cerr << "(col " << rejectCol << ": " << reason << ")";
+        
+        if (valid) newDomain.push_back(patternIndex);
+    }
+    puzzle.rowDomains[row].patternIndeces = newDomain;
+    std::cerr << " -> new domain size: " << newDomain.size() << std::endl;
+}
+
+void filterColPatterns(Puzzle& puzzle, int col) {
+    std::vector <int> newDomain;
+
+    for (int patternIndex : puzzle.colDomains[col].patternIndeces) {
+        uint32_t colMask = puzzle.colPatternMasks[col][patternIndex];
+        bool valid = true;
+
+        for (int r = 0; r < puzzle.rows; r++) {
+            // check 1: row guarantees FILLED at this col
+            if (puzzle.rowDomains[r].andMask & (1u << col)) {
+                if(!(colMask & (1u << r))){
+                    valid = false;
+                    break;
+                }
+            } 
+            // check 2: row guarantees EMPTY at this col
+            if(!(puzzle.rowDomains[r].orMask & (1u << col))) {
+                if (colMask & (1u << r)) {
+                    valid = false;
+                    break;
+                }
+            }
+        }
+        if(valid) newDomain.push_back(patternIndex);
+    }
+    puzzle.colDomains[col].patternIndeces = newDomain;
+}
+
+Puzzle testSingleFilter(Puzzle& puzzle) {
+    puzzle.board = std::vector<std::vector<int>>(puzzle.rows, std::vector<int>(puzzle.cols, UNKNOWN));
+    // generate patterns
+    puzzle.rowPatterns.resize(puzzle.rows);
+    puzzle.rowPatternMasks.resize(puzzle.rows);
+    for(int r = 0; r < puzzle.rows; r++) {
+        puzzle.rowPatterns[r] = generatePatterns(puzzle.cols, puzzle.rowClues[r]);
+        std::cerr << "Row " << r << " patterns: " << puzzle.rowPatterns[r].size() << std::endl;
+        
+        for(int c : puzzle.rowClues[r]) {
+            std::cerr << c << " ";
+        }
+        std::cerr << "-> " << puzzle.rowPatterns[r].size() << " patterns:" << std::endl;
+    
+        for(const auto& pattern : puzzle.rowPatterns[r]) {
+            std::cerr << " ";
+            for(int cell : pattern) {
+                if(cell == FILLED) {
+                    std::cerr << "#";
+                } else {
+                    std::cerr << ".";
+                }
+            }
+            std::cerr << std::endl;
+        }
+
+        puzzle.rowPatternMasks[r].clear();
+        for(const auto& p : puzzle.rowPatterns[r]) {
+            puzzle.rowPatternMasks[r].push_back(patternToMask(p));
+        }
+    }
+
+    puzzle.colPatterns.resize(puzzle.cols);
+    puzzle.colPatternMasks.resize(puzzle.cols);
+    for(int c = 0; c < puzzle.cols; c++) {
+        puzzle.colPatterns[c] = generatePatterns(puzzle.rows, puzzle.colClues[c]);
+        puzzle.colPatternMasks[c].clear();
+        for(const auto& p : puzzle.colPatterns[c]) {
+            puzzle.colPatternMasks[c].push_back(patternToMask(p));
+        }
+    }
+
+    initializeDomains(puzzle);
+
+    std::cerr << "====== before filtering ========" << std::endl;
+    std::cerr << "Col 4 AND = ";
+    for(int r = 0; r < puzzle.rows; r++)
+        std::cerr << ((puzzle.colDomains[4].andMask >> r) & 1);
+    std::cerr << std::endl;
+
+    std::cerr << "Row 2 domain size before: " << puzzle.rowDomains[2].patternIndeces.size() << std::endl;
+
+    int testRow = 2;
+    std::cerr << "\nColumn constraints for row " << testRow << ":" << std::endl;
+    for(int c = 0; c < puzzle.cols; c++) {
+        bool guaranteeFilled = (puzzle.colDomains[c].andMask >> testRow) & 1;
+        bool guaranteeEmpty = !((puzzle.colDomains[c].orMask >> testRow) & 1);
+        std::cerr << "Col " << c
+                    << " AND bit " << testRow << " = " << guaranteeFilled
+                    << " OR bit " << testRow << " = "
+                    << ((puzzle.colDomains[c].orMask >> testRow) & 1)
+                    << " guaranteed empty = " << guaranteeEmpty << ")" << std::endl;
+    }
+
+    filterRowPatterns(puzzle, 2);
+
+    std::cerr << "Row 2 domain size after " << puzzle.rowDomains[2].patternIndeces.size() << std::endl;
+
+    std::cerr << "Row 2 remaining patterns: " << std::endl;
+    for(int i : puzzle.rowDomains[2].patternIndeces) {
+        std::cerr << " ";
+        for(int cell : puzzle.rowPatterns[2][i])
+            std::cerr << (cell == FILLED ? "#" : ".");
+        std::cerr << std::endl;
+    }
+
+    return puzzle;
+    
+}
+
+
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
     int rows = std::stoi(argv[2]);
     int cols = std::stoi(argv[3]);
 
     Puzzle puzzle = readPuzzle(rows, cols);
-    
+    // Puzzle puzzle;
     if(action == "solve") {
         // solvePuzzle(puzzle);
         // testGenerateAllPatterns();
         // testBitmask();
         // testMasks();
-        testInitializeDomains();
+        // testInitializeDomains();
+        puzzle = testSingleFilter(puzzle);
     } else {
         std::cerr << "Unknown action: " << action << std::endl;
         return 1;
