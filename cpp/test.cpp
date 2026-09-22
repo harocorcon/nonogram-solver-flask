@@ -334,6 +334,32 @@ void filterColPatterns(Puzzle& puzzle, int col) {
     puzzle.colDomains[col].patternIndeces = newDomain;
 }
 
+// recompute AND/OR masks for a domain from its curent pattern indeces
+void recomputeRowMasks(Puzzle& puzzle, int row) {
+    std::vector<uint32_t> currentMasks;
+    currentMasks.reserve(puzzle.rowDomains[row].patternIndeces.size());
+
+    for(int index: puzzle.rowDomains[row].patternIndeces) {
+        currentMasks.push_back(puzzle.rowPatternMasks[row][index]);
+    }
+
+    puzzle.rowDomains[row].andMask = computeAndMask(currentMasks);
+    puzzle.rowDomains[row].orMask = computeOrMask(currentMasks);
+}
+
+void recomputeColumnMasks(Puzzle& puzzle, int col) {
+    std::vector<uint32_t> currentMasks;
+    currentMasks.reserve(puzzle.colDomains[col].patternIndeces.size());
+
+    for(int index: puzzle.colDomains[col].patternIndeces) {
+        currentMasks.push_back(puzzle.colPatternMasks[col][index]);
+    }
+
+    puzzle.colDomains[col].andMask = computeAndMask(currentMasks);
+    puzzle.colDomains[col].orMask = computeOrMask(currentMasks);
+}
+
+
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
     int rows = std::stoi(argv[2]);
