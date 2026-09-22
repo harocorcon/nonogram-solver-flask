@@ -359,6 +359,66 @@ void recomputeColumnMasks(Puzzle& puzzle, int col) {
     puzzle.colDomains[col].orMask = computeOrMask(currentMasks);
 }
 
+// Section 3.4
+// This iterative process significantly narrows down the domains of the variables and continues until no further reduction can be made.
+
+// returns true of the puzzle became fully solved (all domains =  1 pattern)
+bool propagateAllConstraints(Puzzle& puzzle, bool verbose = false) {
+    bool changed = true;
+    int iteration = 0;
+    const int MAX_ITERATIONS = 200;
+
+    while( changed && iteration < MAX_ITERATIONS) {
+        changed = false;
+        iteration++;
+
+        if(verbose){
+            std::cerr << "/n----Propagation iteration " << iteration << "----" << std::endl;
+        }
+
+        // 1. Filter rows using current column masks
+        for(int r = 0; r < puzzle.rows; r++) {
+            int oldSize = puzzle.rowDomains[r].patternIndeces.size();
+            filterRowPatterns(puzzle, r);
+            int newSize = puzzle.rowDomains[r].patternIndeces.size();
+            
+            if(newSize < oldSize) {
+                changed = true;
+                recomputeRowMasks(puzzle, r);
+                if(verbose) {
+                    std::cerr << "Row " << r << ":" << oldSize << " -> " << newSize << " patterns" << std::endl;
+                }
+            }
+        }
+
+        // 2. Filter columns using updated row masks
+        for(int c = 0; c < puzzle.cols; c++) {
+            int oldSize = puzzle.colDomains[c].patternIndeces.size();
+            filterColPatterns(puzzle, c);
+            int newSize = puzzle.colDomains[c].patternIndeces.size();
+
+            if(newSize != oldSize) {
+                changed = true;
+                recomputeColumnMasks(puzzle, c);
+                if(verbose) {
+                    std::cerr << "Col " << c << ": " << oldSize << " -> " << newSize << " patterns" << std::endl;
+                }
+            }
+        }
+    }
+
+    // check if solved
+    for(int r = 0; r < puzzle.rows; r++) {
+        if(puzzle.rowDomains[r].patternIndeces.size() != 1) return false;
+    }
+
+    for(int c = 0; c < puzzle.cols; c++) {
+        if(puzzle.colDomains[c].patternIndeces.size() != 1) return false;
+    }
+
+    return true;
+}
+
 
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
