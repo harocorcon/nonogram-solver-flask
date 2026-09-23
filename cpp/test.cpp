@@ -419,6 +419,16 @@ bool propagateAllConstraints(Puzzle& puzzle, bool verbose = false) {
     return true;
 }
 
+// call only after propagateAllConstraints returns true
+void reconstructBoardFromDomains(Puzzle& puzzle) {
+    for(int r = 0; r < puzzle.rows; r++) {
+        int patternIndex = puzzle.rowDomains[r].patternIndeces[0];
+
+        for(int c = 0; c < puzzle.cols; c++) {
+            puzzle.board[r][c] = puzzle.rowPatterns[r][patternIndex][c];
+        }
+    }
+}
 
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
