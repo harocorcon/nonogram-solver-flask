@@ -430,6 +430,38 @@ void reconstructBoardFromDomains(Puzzle& puzzle) {
     }
 }
 
+void printAmbiguousDomains(const Puzzle& puzzle) {
+    std::cerr << "\nAmbiguous rows/columns (domain > 1): " << std::endl;
+    bool anyAmbiguous = false;
+
+    for (int r = 0; r < puzzle.rows; r++) {
+        size_t n = puzzle.rowDomains[r].patternIndeces.size();
+        if(n > 1) {
+            std::cerr << " Row " << r << ": " << n << " patterns remain" << std:: endl;
+            anyAmbiguous = true;
+        } else if( n == 0 ) {
+            std::cerr << " Row " << r << ": EMPTY DOMAIN (contradiction!)" << std::endl;
+            anyAmbiguous = true;
+        }
+    }
+    
+    for(int c = 0; c < puzzle.cols; c++) {
+        size_t n = puzzle.colDomains[c].patternIndeces.size();
+        
+        if(n > 1) {
+            std::cerr << " Col " << c << ": " << n << " patterns remain" << std::endl;
+            anyAmbiguous = true;
+        } else if( n == 0 ) {
+            std::cerr << " Col " << c << ": empty domain!" << std::endl;
+            anyAmbiguous = true;
+        }
+    }
+
+    if(!anyAmbiguous) {
+        std::cerr << " (none - puzze is solved)" << std::endl;
+    }
+}
+
  enum SolveMethod {
     PROPAGATION_ONLY,
     PROPAGATION_WITH_BACKTRACK,
@@ -439,11 +471,43 @@ void reconstructBoardFromDomains(Puzzle& puzzle) {
 
  bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
     std::cerr << "Generating all patterns..." << std::endl;
-    generatePatterns(puzzle.rows, puzzle.rowClues[0]);
+    // generatePatterns(puzzle.rows, puzzle.rowClues[0]);
+    
     initializeDomains(puzzle);
+    std::cerr << "\nRunninh constraint propagation" << std::endl;
+    bool solved = propagateAllConstraints(puzzle, verbose);
 
+    if(solved) {
+        std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
+        reconstructBoardFromDomains(puzzle);
+        return true;
+    }
 
- }
+    // Propagation finished but puzzle is not filly solved
+    std::cerr << "\n[STUCK] Propagation ould not fully solve." << std::endl;
+    // printAmbiguousDomains(puzzle);
+
+    // Fallback per method
+    switch (method) {
+        case PROPAGATION_ONLY:
+            std::cerr << "[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
+            return false;
+
+        case PROPAGATION_WITH_BACKTRACK:
+            std::cerr << "[METHOD] PROPAGATION_WITH_BACKTRACK not yet implemented." << std::endl;
+            return false;
+
+        case PROPAGATION_WITH_ACO:
+            std::cerr << "[METHOD] PROPAGATION_WITH_ACO not yet implemented." << std::endl;
+            return false;
+
+        case PROPAGATION_WITH_ACO_SA:
+            std::cerr << "[METHOD] PROPAGATION_WITH_ACO_SA not yet implemented." << std::endl;
+            return false;
+            
+        return false;
+    }
+}
 
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
