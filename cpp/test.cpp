@@ -510,14 +510,35 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
 }
 
 int main(int argc, char* argv[]) {
+    if(argc < 5) {
+        std::cerr << "Usage: " << argv[0] << " <method> <rows> <cols>" << std:: endl;
+        std::cerr << " method: propagation | backtrack | aco | aco_sa" << std::endl;
+        return 1;
+    }
+
     std::string action = argv[1];
     int rows = std::stoi(argv[2]);
     int cols = std::stoi(argv[3]);
+    std::string methodStr = argv[4];
+
+    SolveMethod method;
+    if(methodStr == "propagation")
+        method = PROPAGATION_ONLY;
+    else if ( methodStr == "backtrack")
+        method = PROPAGATION_WITH_BACKTRACK;
+    else if (methodStr == "aco") 
+        method = PROPAGATION_WITH_ACO;
+    else if (methodStr == "aco_sa")
+        method = PROPAGATION_WITH_ACO_SA;
+    else{
+        std::cerr << "Unknown method: " << methodStr << std::endl;
+        return 1; 
+    }
 
     Puzzle puzzle = readPuzzle(rows, cols);
     // Puzzle puzzle;
     if(action == "solve") {
-        // solvePuzzle(puzzle);
+        bool solved = solvePuzzle(puzzle, method, true);
     } else {
         std::cerr << "Unknown action: " << action << std::endl;
         return 1;
