@@ -138,7 +138,7 @@ std::vector<std::vector<int>> generatePatterns(
 
 
 
-void solvePuzzle(Puzzle& puzzle) {
+void xsolvePuzzle(Puzzle& puzzle) {
     for (int r = 0; r < puzzle.rows; r++)
     {
         for (int c = 0; c < puzzle.cols; c++)
@@ -429,6 +429,21 @@ void reconstructBoardFromDomains(Puzzle& puzzle) {
         }
     }
 }
+
+ enum SolveMethod {
+    PROPAGATION_ONLY,
+    PROPAGATION_WITH_BACKTRACK,
+    PROPAGATION_WITH_ACO,
+    PROPAGATION_WITH_ACO_SA
+ };
+
+ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
+    std::cerr << "Generating all patterns..." << std::endl;
+    generatePatterns(puzzle.rows, puzzle.rowClues[0]);
+    initializeDomains(puzzle);
+
+
+ }
 
 int main(int argc, char* argv[]) {
     std::string action = argv[1];
