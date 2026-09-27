@@ -469,10 +469,41 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
     PROPAGATION_WITH_ACO_SA
  };
 
- bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
+bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
     std::cerr << "Generating all patterns..." << std::endl;
-    // generatePatterns(puzzle.rows, puzzle.rowClues[0]);
     
+    // generate row patterns
+    puzzle.rowPatterns.resize(puzzle.rows);
+    puzzle.rowPatternMasks.resize(puzzle.rows);
+    for(int r = 0; r < puzzle.rows; r++){
+        std::cerr << "Generating Row " << r << ": ";
+        for(int c : puzzle.rowClues[r]) std::cerr << c << " ";
+        
+        puzzle.rowPatterns[r] = generatePatterns(puzzle.cols, puzzle.rowClues[r]);
+        std::cerr << " size: " << puzzle.rowPatterns[r].size() << " patterns" << std::endl;
+
+        puzzle.rowPatternMasks[r].clear();
+        for(const auto& p: puzzle.rowPatterns[r]) {
+            puzzle.rowPatternMasks[r].push_back(patternToMask(p));
+        }
+    }   
+    
+    // generate column patterns
+    puzzle.colPatterns.resize(puzzle.cols);
+    puzzle.colPatternMasks.resize(puzzle.cols);
+
+    for(int c = 0; c < puzzle.cols; c++) {
+        std::cerr << "Generating column patterns " << c << " ";
+
+        puzzle.colPatterns[c] = generatePatterns(puzzle.rows, puzzle.colClues[c]);
+        std::cerr << " size: " << puzzle.colPatterns[c].size() << " patterns" << std::endl;
+
+        puzzle.colPatternMasks[c].clear();
+        for(const auto& p: puzzle.colPatterns[c]) {
+            puzzle.colPatternMasks[c].push_back(patternToMask(p));
+        }
+    }
+
     initializeDomains(puzzle);
     std::cerr << "\nRunninh constraint propagation" << std::endl;
     bool solved = propagateAllConstraints(puzzle, verbose);
@@ -482,8 +513,7 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
         reconstructBoardFromDomains(puzzle);
         return true;
     }
-
-    // Propagation finished but puzzle is not filly solved
+     // Propagation finished but puzzle is not filly solved
     std::cerr << "\n[STUCK] Propagation ould not fully solve." << std::endl;
     // printAmbiguousDomains(puzzle);
 
@@ -507,19 +537,21 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
             
         return false;
     }
+
+    return true;
 }
 
 int main(int argc, char* argv[]) {
-    if(argc < 5) {
-        std::cerr << "Usage: " << argv[0] << " <method> <rows> <cols>" << std:: endl;
+    if(argc < 4) {
+        std::cerr << "Usage: " << argv[0] << " <method> <rows> <cols>" << argv[1] << std:: endl;
         std::cerr << " method: propagation | backtrack | aco | aco_sa" << std::endl;
         return 1;
     }
-
+    std::cerr << "yow " << argv[2] << argv[3] << argv[4] << std::endl;
     std::string action = argv[1];
-    int rows = std::stoi(argv[2]);
-    int cols = std::stoi(argv[3]);
-    std::string methodStr = argv[4];
+    std::string methodStr = argv[2];
+    int rows = std::stoi(argv[3]);
+    int cols = std::stoi(argv[4]);
 
     SolveMethod method;
     if(methodStr == "propagation")
@@ -536,14 +568,8 @@ int main(int argc, char* argv[]) {
     }
 
     Puzzle puzzle = readPuzzle(rows, cols);
-    // Puzzle puzzle;
-    if(action == "solve") {
-        bool solved = solvePuzzle(puzzle, method, true);
-    } else {
-        std::cerr << "Unknown action: " << action << std::endl;
-        return 1;
-    }
-
+    
+    bool solved = solvePuzzle(puzzle, method, true);
     printBoard(puzzle);
     
     return 0;
