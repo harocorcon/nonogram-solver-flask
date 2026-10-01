@@ -491,6 +491,18 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
     return order;
  }
 
+ struct Assignment {
+    // for each row: pattern index, or -1 if unassigned
+    std::vector<int> rowPattern;
+    // for each col: pattern index, or -1 if unassigned
+    std::vector<int> colPattern;
+
+    Assignment(int rows, int cols) {
+        rowPattern.assign(rows, -1);
+        colPattern.assign(cols, -1);
+    }
+ }
+
  void testVarOrdering() {
     std::cerr << " ===== Testing var ordering ======" << std::endl;
 
