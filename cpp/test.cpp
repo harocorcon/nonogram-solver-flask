@@ -469,6 +469,53 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
     PROPAGATION_WITH_ACO_SA
  };
 
+ // From paper Section 3.4: 
+ // " Our approach relies on a fixed ordering of variables: R1, C1, R2, C2, ..."
+ // "variable" here is a row or a column. we represent each as a small struct
+ enum VarKind { VAR_ROW, VAR_COL };
+
+ struct Var {
+    VarKind kind;
+    int index; // row index or column index
+ };
+
+ // build the interleaved ordering R0, C0, R1, C1, ....
+ // If rows and columns differ in count, the leftover ones are appended at the end.
+ std::vector<Var> buildVarOrdering(int rows, int cols) {
+    std::vector<Var> order;
+    int maxLen = std::max(rows, cols);
+    for(int i = 0; i < maxLen; i++) {
+        if(i < rows) order.push_back({VAR_ROW, i});
+        if(i < cols) order.push_back({VAR_COL, i});
+    }
+    return order;
+ }
+
+ void testVarOrdering() {
+    std::cerr << " ===== Testing var ordering ======" << std::endl;
+
+    auto order5x5 = buildVarOrdering(5, 5);
+    for(const Var& v: order5x5) {
+        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
+    }
+    std::cerr << std::endl;
+
+    auto order7x7 = buildVarOrdering(7, 7);
+    for(const Var& v: order7x7) {
+        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
+    }
+    std::cerr << std::endl;
+
+    // Different sizes
+    auto order3x5 = buildVarOrdering(3, 5);
+    std::cerr << "3x5 ordering: ";
+    for (const Var& v : order3x5) {
+        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
+    }
+    std::cerr << std::endl;
+ }
+
+
 bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
     std::cerr << "Generating all patterns..." << std::endl;
     
@@ -547,11 +594,12 @@ int main(int argc, char* argv[]) {
         std::cerr << " method: propagation | backtrack | aco | aco_sa" << std::endl;
         return 1;
     }
-    std::cerr << "yow " << argv[2] << argv[3] << argv[4] << std::endl;
     std::string action = argv[1];
     std::string methodStr = argv[2];
     int rows = std::stoi(argv[3]);
     int cols = std::stoi(argv[4]);
+
+    testVarOrdering();
 
     SolveMethod method;
     if(methodStr == "propagation")
