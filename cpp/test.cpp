@@ -501,6 +501,106 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
         rowPattern.assign(rows, -1);
         colPattern.assign(cols, -1);
     }
+ };
+
+ // check whether a candidate pattern for variable V is 
+ // consistent with all currently assigned variables that intersect V
+bool isConsistent(
+    const Puzzle& puzzle,
+    const Assignment& assign,
+    Var V,
+    int candidatePatternIndex
+ ) {
+    if(V.kind == VAR_ROW) {
+        // candidate is a row pattern. check against every assigned column.
+        uint32_t rowMask = puzzle.rowPatternMasks[V.index][candidatePatternIndex];
+
+        for(int c = 0; c < puzzle.cols; c++) {
+            int colPatternIndex = assign.colPattern[c];
+            if(colPatternIndex == -1) continue; // column not assigned yet
+
+            uint32_t colMask = puzzle.colPatternMasks[c][colPatternIndex];
+
+            // shared cell is (V.index, c)
+            // row says: (rowMask >> c) & 1
+            // col says: (colMask >> V.index) & 1
+            bool rowFilled = (rowMask >> c) & 1u;
+            bool colFilled = (colMask >> V.index) & 1u;
+
+            if(rowFilled != colFilled) return false;
+        }
+        return true;
+    } else {
+        // candidate is a column pattern. check against every assigned row.
+        uint32_t colMask = puzzle.colPatternMasks[V.index][candidatePatternIndex];
+
+        for(int r = 0; r < puzzle.rows; r++) {
+            int rowPatternIndex = assign.rowPattern[r];
+            if(rowPatternIndex == -1) continue; // row not assigned yet
+
+            uint32_t rowMask = puzzle.rowPatternMasks[r][rowPatternIndex];
+
+            // shared cell is (r, V.index)
+            bool rowFilled = (rowMask >> V.index) & 1u;
+            bool colFilled = (colMask >> r) & 1u;
+            if(rowFilled != colFilled) return false;
+        }
+        return true; 
+    }
+ }
+
+ void testConsistency() {
+    std::cerr << "====Testing consistency check=====" << std::endl;
+
+    // minimal 2x2 puzzle setup
+    // row 0 clues {1}, row 1 clues {1}
+    // col 0 clues{1}, col 1 clues {1}
+    Puzzle puzzle;
+    puzzle.rows = 2;
+    puzzle.cols = 2;
+    puzzle.rowClues = {{1}, {1}};
+    puzzle.colClues = {{1}, {1}};
+    puzzle.board = std::vector<std::vector<int>>(2, std::vector<int>(2, UNKNOWN));
+    
+    puzzle.rowPatterns.resize(2);
+    puzzle.rowPatternMasks.resize(2);
+
+    for(int r = 0; r < 2; r++) { 
+        puzzle.rowPatterns[r] = generatePatterns(2, puzzle.rowClues[r]);
+        puzzle.rowPatternMasks[r].clear();
+        for(const auto& p : puzzle.rowPatterns[r])
+            puzzle.rowPatternMasks[r].push_back(patternToMask(p));
+    }
+    puzzle.colPatterns.resize(2);
+    puzzle.colPatternMasks.resize(2);
+    for(int c = 0; c < 2; c++) {
+        puzzle.colPatterns[c] = generatePatterns(2, puzzle.colClues[c]);
+        puzzle.colPatternMasks[c].clear();
+        for(const auto& p : puzzle.colPatterns[c])
+            puzzle.colPatternMasks[c].push_back(patternToMask(p));
+    }
+
+    // print row 0 patterns
+    std::cerr <<" Row 0 patterns: " << std::endl;
+    for(int i = 0; i < puzzle.rowPatterns[0].size(); i++) {
+        std::cerr << " [" << i << "] ";
+        for(int cell : puzzle.rowPatterns[0][i])
+            std::cerr << (cell == FILLED ? "#" : ".");
+        std::cerr << " mask=" << puzzle.rowPatternMasks[0][i] << std::endl;
+    }
+
+    // print column 0 patterns
+    std::cerr << " Col 0 patterns: " << std::endl;
+    for(int i = 0; i < puzzle.colPatterns[0].size(); i++) {
+        std::cerr << " [" << i << "] ";
+        for(int cell : puzzle.colPatterns[0][i])
+            std::cerr << (cell == FILLED? "#" : ".");
+        std::cerr << " mask=" << puzzle.colPatternMasks[0][i] << std::endl;
+    }
+
+    Assignment assign(2,2);
+    // assign col 0 pattern index 0 (#. means cell(0,0)=filled)
+
  }
 
  void testVarOrdering() {
@@ -611,7 +711,7 @@ int main(int argc, char* argv[]) {
     int rows = std::stoi(argv[3]);
     int cols = std::stoi(argv[4]);
 
-    testVarOrdering();
+    testConsistency();
 
     SolveMethod method;
     if(methodStr == "propagation")
@@ -629,7 +729,7 @@ int main(int argc, char* argv[]) {
 
     Puzzle puzzle = readPuzzle(rows, cols);
     
-    bool solved = solvePuzzle(puzzle, method, true);
+    // bool solved = solvePuzzle(puzzle, method, true);
     printBoard(puzzle);
     
     return 0;
