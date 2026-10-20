@@ -496,6 +496,7 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
     std::vector<int> rowPattern;
     // for each col: pattern index, or -1 if unassigned
     std::vector<int> colPattern;
+    int assignedCount = 0;
 
     Assignment(int rows, int cols) {
         rowPattern.assign(rows, -1);
@@ -548,6 +549,131 @@ bool isConsistent(
         return true; 
     }
  }
+
+ // Global-ish counters for benchmarking
+ struct BacktrackStats {
+    long long nodesVisited = 0;         // recursion calls
+    long long consistencyChecks = 0;    // how many isConsistent() calls
+    long long backtracks = 0;           // how many times we undid
+ };
+
+bool backtrackRecursive(
+    const Puzzle& puzzle,
+    const std::vector<Var>& order,
+    Assignment& assign,
+    int depth,
+    BacktrackStats& stats
+) {
+    stats.nodesVisited++;
+
+    // base case: all variables are assigned
+    if(assign.assignedCount == (int)order.size()) {
+        return true; // solved!
+    }
+
+    // choose the next variable
+    Var V = order[depth];
+
+    const std::vector<int>& domain = (V.kind == VAR_ROW)
+        ? puzzle.rowDomains[V.index].patternIndeces
+        : puzzle.colDomains[V.index].patternIndeces;
+
+    // try every pattern from the domain
+    for(int candidateIndex : domain) {
+        stats.consistencyChecks++;
+        if(!isConsistent(puzzle, assign, V, candidateIndex)) {
+            continue;
+        }
+
+        if(V.kind == VAR_ROW) 
+            assign.rowPattern[V.index] = candidateIndex;
+        else
+            assign.colPattern[V.index] = candidateIndex;
+        assign.assignedCount++;
+
+        if(backtrackRecursive(puzzle, order, assign, depth + 1, stats))
+            return true;
+
+        if(V.kind == VAR_ROW)
+            assign.rowPattern[V.index] = -1;
+        else    
+            assign.colPattern[V.index] = -1;
+        
+        assign.assignedCount--;
+        stats.backtracks++;
+    }
+    return false;
+}
+
+bool backtrackingSolve(Puzzle& puzzle, BacktrackStats& stats) {
+    std::vector<Var> order = buildVarOrdering(puzzle.rows, puzzle.cols);
+    Assignment assign(puzzle.rows, puzzle.cols);
+
+    stats = BacktrackStats{};
+
+    bool solved = backtrackRecursive(puzzle, order, assign, 0, stats);
+
+    if(solved) {
+        for(int r = 0; r < puzzle.rows; r++) {
+            int pIndex = assign.rowPattern[r];
+            for(int c = 0; c < puzzle.cols; c++) {
+                puzzle.board[r][c] = puzzle.rowPatterns[r][pIndex][c];
+            }
+        }
+    }
+
+    return solved;
+}
+
+
+void generateAllPatterns(Puzzle& puzzle) {
+    // --- ROWS ---
+    puzzle.rowPatterns.resize(puzzle.rows);
+    puzzle.rowPatternMasks.resize(puzzle.rows);   
+    
+    for (int r = 0; r < puzzle.rows; r++) {
+        puzzle.rowPatterns[r] = generatePatterns(puzzle.cols, puzzle.rowClues[r]);
+        puzzle.rowPatternMasks[r].clear();
+        for (const auto& p : puzzle.rowPatterns[r])
+            puzzle.rowPatternMasks[r].push_back(patternToMask(p));
+    }
+    
+    // --- COLUMNS ---
+    puzzle.colPatterns.resize(puzzle.cols);       // use puzzle.cols
+    puzzle.colPatternMasks.resize(puzzle.cols);
+    
+    for (int c = 0; c < puzzle.cols; c++) {
+        puzzle.colPatterns[c] = generatePatterns(puzzle.rows, puzzle.colClues[c]);
+        puzzle.colPatternMasks[c].clear();
+        for (const auto& p : puzzle.colPatterns[c])
+            puzzle.colPatternMasks[c].push_back(patternToMask(p));
+    }
+}
+
+void testBacktracking2x2(Puzzle& puzzle) {
+    std::cerr << "==== Testing backtracking on 5x5 =====" << std::endl;
+
+    // Puzzle puzzle;
+    // puzzle.rows = 2;
+    // puzzle.cols = 2;
+    // puzzle.rowClues = {{2}, {2}};
+    // puzzle.colClues = {{2}, {2}};
+    // puzzle.board = std::vector<std::vector<int>>(2, std::vector<int>(2, UNKNOWN));
+
+    generateAllPatterns(puzzle);
+    initializeDomains(puzzle);
+
+    BacktrackStats stats;
+    bool solved = backtrackingSolve(puzzle, stats);
+
+    std::cerr << "Solved: " << (solved ? "YES" : "NO") << std::endl;
+    std::cerr << "Nodes visited: " << stats.nodesVisited << std::endl;
+    std::cerr << "Consistency checks: " << stats.consistencyChecks << std::endl;
+    std::cerr << "Backtracks: " << stats.backtracks << std::endl;
+
+    if(solved) printBoard(puzzle);
+    
+}
 
  void testConsistency() {
     std::cerr << "====Testing consistency check=====" << std::endl;
@@ -711,7 +837,6 @@ int main(int argc, char* argv[]) {
     int rows = std::stoi(argv[3]);
     int cols = std::stoi(argv[4]);
 
-    testConsistency();
 
     SolveMethod method;
     if(methodStr == "propagation")
@@ -729,6 +854,7 @@ int main(int argc, char* argv[]) {
 
     Puzzle puzzle = readPuzzle(rows, cols);
     
+    testBacktracking2x2(puzzle);
     // bool solved = solvePuzzle(puzzle, method, true);
     printBoard(puzzle);
     
