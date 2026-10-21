@@ -58,20 +58,19 @@ def clear():
 
 @app.route("/solve")
 def solve():
-    print("route /solve in app.py")
     with open("puzzle.txt", "r") as f:
         puzzle_text = f.read()
+    solver = request.args.get("solver", "propagation")
+    print(solver, "route /solve in app.py")
 
-    # print("PUZZLE TEXT:")
-    # print(puzzle_text)
-    # print("NUMBER OF LINES:", len(puzzle_text.splitlines()))
-    
     result = subprocess.run(
-        ["cpp/test.exe", 
-         "solve",
-         "propagation",
-         str(len(board)), # row size
-         str(len(board[0]))], # column size
+        [
+            "cpp/test.exe", 
+            "solve",
+            solver,
+            str(len(board)), # row size
+            str(len(board[0]))
+        ],
         input=puzzle_text,
         capture_output=True,
         text=True 

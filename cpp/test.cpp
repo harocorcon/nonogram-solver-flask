@@ -261,7 +261,7 @@ void initializeDomains(Puzzle& puzzle) {
 // "These two tuples are used to filter the domains of intersecting
 // row/column variables"
 void filterRowPatterns(Puzzle& puzzle, int row) {
-    std::cerr << "Filtering row patterns for row " << row << "domain size = " << puzzle.rowDomains[row].patternIndeces.size() << " -- " << std::endl;
+    // std::cerr << "Filtering row patterns for row " << row << "domain size = " << puzzle.rowDomains[row].patternIndeces.size() << " -- " << std::endl;
     
     std::vector<int> newDomain;
 
@@ -296,14 +296,14 @@ void filterRowPatterns(Puzzle& puzzle, int row) {
         std::cerr << "\npattern " << patternIndex << "[";
         for(int c = 0; c < puzzle.cols; c++)
             std::cerr << ((rowMask >> c) & 1);
-        std::cerr << "] -> " << (valid ? "KEEP" : "REJECT");
+        // std::cerr << "] -> " << (valid ? "KEEP" : "REJECT");
         if(!valid)
             std::cerr << "(col " << rejectCol << ": " << reason << ")";
         
         if (valid) newDomain.push_back(patternIndex);
     }
     puzzle.rowDomains[row].patternIndeces = newDomain;
-    std::cerr << " -> new domain size: " << newDomain.size() << std::endl;
+    // std::cerr << " -> new domain size: " << newDomain.size() << std::endl;
 }
 
 void filterColPatterns(Puzzle& puzzle, int col) {
@@ -757,67 +757,47 @@ void testBacktracking2x2(Puzzle& puzzle) {
 bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
     std::cerr << "Generating all patterns..." << std::endl;
     
-    // generate row patterns
-    puzzle.rowPatterns.resize(puzzle.rows);
-    puzzle.rowPatternMasks.resize(puzzle.rows);
-    for(int r = 0; r < puzzle.rows; r++){
-        std::cerr << "Generating Row " << r << ": ";
-        for(int c : puzzle.rowClues[r]) std::cerr << c << " ";
-        
-        puzzle.rowPatterns[r] = generatePatterns(puzzle.cols, puzzle.rowClues[r]);
-        std::cerr << " size: " << puzzle.rowPatterns[r].size() << " patterns" << std::endl;
-
-        puzzle.rowPatternMasks[r].clear();
-        for(const auto& p: puzzle.rowPatterns[r]) {
-            puzzle.rowPatternMasks[r].push_back(patternToMask(p));
-        }
-    }   
-    
-    // generate column patterns
-    puzzle.colPatterns.resize(puzzle.cols);
-    puzzle.colPatternMasks.resize(puzzle.cols);
-
-    for(int c = 0; c < puzzle.cols; c++) {
-        std::cerr << "Generating column patterns " << c << " ";
-
-        puzzle.colPatterns[c] = generatePatterns(puzzle.rows, puzzle.colClues[c]);
-        std::cerr << " size: " << puzzle.colPatterns[c].size() << " patterns" << std::endl;
-
-        puzzle.colPatternMasks[c].clear();
-        for(const auto& p: puzzle.colPatterns[c]) {
-            puzzle.colPatternMasks[c].push_back(patternToMask(p));
-        }
-    }
-
+    generateAllPatterns(puzzle);
     initializeDomains(puzzle);
-    std::cerr << "\nRunninh constraint propagation" << std::endl;
-    bool solved = propagateAllConstraints(puzzle, verbose);
 
-    if(solved) {
-        std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
-        reconstructBoardFromDomains(puzzle);
-        return true;
-    }
-     // Propagation finished but puzzle is not filly solved
-    std::cerr << "\n[STUCK] Propagation ould not fully solve." << std::endl;
-    // printAmbiguousDomains(puzzle);
+    std::cerr << "\nRunning constraint propagation" << std::endl;
 
-    // Fallback per method
+    bool propagation = propagateAllConstraints(puzzle, verbose);
+
     switch (method) {
-        case PROPAGATION_ONLY:
+        case PROPAGATION_ONLY: {
             std::cerr << "[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
-            return false;
+            if(propagation) {
+                std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
+                reconstructBoardFromDomains(puzzle);
+                return true;
+            }
+            else{
+                std::cerr << "\n[STUCK] Propagation could not fully solve." << std::endl;
+              // printAmbiguousDomains(puzzle);
+            }
+            return propagation;
+        }
 
-        case PROPAGATION_WITH_BACKTRACK:
-            std::cerr << "[METHOD] PROPAGATION_WITH_BACKTRACK not yet implemented." << std::endl;
-            return false;
+        case PROPAGATION_WITH_BACKTRACK: {
+            std::cerr << "\n[METHOD] PROPAGATION_WITH_BACKTRACK" << std::endl;
+            BacktrackStats stats;
+            bool solved = backtrackingSolve(puzzle, stats);
+
+            std::cerr << "Solved: " << (solved ? "YES" : "NO") << std::endl;
+            std::cerr << "Nodes visited: " << stats.nodesVisited << std::endl;
+            std::cerr << "Consistency checks: " << stats.consistencyChecks << std::endl;
+            std::cerr << "Backtracks: " << stats.backtracks << std::endl;
+
+            return solved;
+        }
 
         case PROPAGATION_WITH_ACO:
-            std::cerr << "[METHOD] PROPAGATION_WITH_ACO not yet implemented." << std::endl;
+            std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO not yet implemented." << std::endl;
             return false;
 
         case PROPAGATION_WITH_ACO_SA:
-            std::cerr << "[METHOD] PROPAGATION_WITH_ACO_SA not yet implemented." << std::endl;
+            std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO_SA not yet implemented." << std::endl;
             return false;
             
         return false;
@@ -839,9 +819,9 @@ int main(int argc, char* argv[]) {
 
 
     SolveMethod method;
-    if(methodStr == "propagation")
+    if(methodStr == "propagation-only")
         method = PROPAGATION_ONLY;
-    else if ( methodStr == "backtrack")
+    else if ( methodStr == "pwb")
         method = PROPAGATION_WITH_BACKTRACK;
     else if (methodStr == "aco") 
         method = PROPAGATION_WITH_ACO;
@@ -854,9 +834,8 @@ int main(int argc, char* argv[]) {
 
     Puzzle puzzle = readPuzzle(rows, cols);
     
-    testBacktracking2x2(puzzle);
-    // bool solved = solvePuzzle(puzzle, method, true);
-    printBoard(puzzle);
+    bool solved = solvePuzzle(puzzle, method, true);
+    if(solved) printBoard(puzzle);
     
     return 0;
 }
