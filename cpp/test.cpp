@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <cstdint>
+#include <chrono>
 
 const int UNKNOWN = 0;
 const int FILLED = 1;
@@ -277,7 +278,7 @@ void filterRowPatterns(Puzzle& puzzle, int row) {
                 if (!(rowMask & (1u << c))) {
                     valid = false;
                     rejectCol = c;
-                    reason = "Column guarantees FILLED but pattern is EMPTY";
+                    reason = "\nColumn guarantees FILLED but pattern is EMPTY";
                     break;
                 }
             }
@@ -287,7 +288,7 @@ void filterRowPatterns(Puzzle& puzzle, int row) {
                 if (rowMask & (1u << c)) {
                     valid = false;
                     rejectCol = c;
-                    reason = "Column guarantees EMPTY but pattern is FILLED";
+                    reason = "\nColumn guarantees EMPTY but pattern is FILLED";
                     break;
                 }
             }
@@ -373,7 +374,7 @@ bool propagateAllConstraints(Puzzle& puzzle, bool verbose = false) {
         iteration++;
 
         if(verbose){
-            std::cerr << "/n----Propagation iteration " << iteration << "----" << std::endl;
+            std::cerr << "\n----Propagation iteration " << iteration << "----" << std::endl;
         }
 
         // 1. Filter rows using current column masks
@@ -766,7 +767,7 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
 
     switch (method) {
         case PROPAGATION_ONLY: {
-            std::cerr << "[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
+            std::cerr << "\n[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
             if(propagation) {
                 std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
                 reconstructBoardFromDomains(puzzle);
@@ -807,6 +808,7 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
 }
 
 int main(int argc, char* argv[]) {
+
     if(argc < 4) {
         std::cerr << "Usage: " << argv[0] << " <method> <rows> <cols>" << argv[1] << std:: endl;
         std::cerr << " method: propagation | backtrack | aco | aco_sa" << std::endl;
@@ -817,6 +819,7 @@ int main(int argc, char* argv[]) {
     int rows = std::stoi(argv[3]);
     int cols = std::stoi(argv[4]);
 
+    auto start = std::chrono::high_resolution_clock::now();
 
     SolveMethod method;
     if(methodStr == "propagation-only")
@@ -836,6 +839,9 @@ int main(int argc, char* argv[]) {
     
     bool solved = solvePuzzle(puzzle, method, true);
     if(solved) printBoard(puzzle);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cerr << "Total time: " << ms << " ms" << std::endl;
     
     return 0;
 }

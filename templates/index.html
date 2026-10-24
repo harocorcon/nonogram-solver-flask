@@ -76,12 +76,27 @@
             </div>
         </div>
 
-        <div>
-            <button class="button" id="clear-button">Clear Board</button>
-        </div>
+        <div class="button-group">
+            <div>
+                <button class="button" id="clear-button">Clear Board</button>
+            </div>
 
-        <div>
-            <button class="button" id="solve-button">Solve Puzzle</button>
+            <div>
+                <button class="button solver-button" 
+                        id="solve-prop" 
+                        data-solver="propagation-only"
+                >
+                        Propagation Only
+                </button>
+            </div>
+
+            <div>
+                <button class="button solver-button" 
+                        id="solve-pwb"
+                        data-solver="pwb"
+                >
+                        Propagation + Backtracking</button>
+            </div>
         </div>
     </div>
 
@@ -120,7 +135,7 @@
         });
 
         const clearButton = document.getElementById("clear-button");
-        const solveButton = document.getElementById("solve-button");
+        const solverButtons = document.querySelectorAll(".solver-button");
 
         clearButton.addEventListener("click", () => {
             fetch("/clear")
@@ -130,13 +145,17 @@
             })
         })
 
-        solveButton.addEventListener("click", () => {
-            fetch("/solve")
-            .then(response => response.json())
-            .then(data => {
-                updateBoard(data.board);
-            })
-        })
+        solverButtons.forEach(button => {
+            button.addEventListener("click", () => {
+                const solver = button.dataset.solver;
+
+                fetch(`/solve?solver=${solver}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        updateBoard(data.board);
+                    });
+            });
+        });
 
         function updateAppearance(cell, state) {
             cell.classList.remove('filled');
