@@ -137,30 +137,6 @@ std::vector<std::vector<int>> generatePatterns(
     return patterns;
 }
 
-
-
-void xsolvePuzzle(Puzzle& puzzle) {
-    for (int r = 0; r < puzzle.rows; r++)
-    {
-        for (int c = 0; c < puzzle.cols; c++)
-        {
-            puzzle.board[r][c] = FILLED;
-        }
-    }
-
-    std::vector<int> clues = {2, 1};
-
-    std::vector<std::vector<int>> patterns = generatePatterns(5, clues);
-
-    for(const auto& pattern : patterns) {
-        for (int cell : pattern) {
-            std::cerr << cell << "-";
-        }
-        std::cerr << "\n";
-    }
-
-}
-
 void printBoard(const Puzzle& puzzle)
 {
     for(const auto& row : puzzle.board)
@@ -226,6 +202,13 @@ Puzzle readPuzzle(int rows, int cols) {
     return puzzle;
 }
 
+
+//  Copilot
+// The initializeDomains function initializes the row and column domains of a Puzzle
+// object by resizing the rowDomains and colDomains vectors, setting up possible pattern
+// indices, and computing the AND and OR masks for each row and column based on 
+// their respective pattern masks. This setup is essential for managing the 
+// constraints and possibilities within the puzzle's structure.
 void initializeDomains(Puzzle& puzzle) { 
     puzzle.rowDomains.resize(puzzle.rows);
     puzzle.colDomains.resize(puzzle.cols);
@@ -363,7 +346,7 @@ void recomputeColumnMasks(Puzzle& puzzle, int col) {
 // Section 3.4
 // This iterative process significantly narrows down the domains of the variables and continues until no further reduction can be made.
 
-// returns true of the puzzle became fully solved (all domains =  1 pattern)
+// returns true if the puzzle became fully solved (all domains =  1 pattern)
 bool propagateAllConstraints(Puzzle& puzzle, bool verbose = false) {
     bool changed = true;
     int iteration = 0;
@@ -426,7 +409,8 @@ void reconstructBoardFromDomains(Puzzle& puzzle) {
         int patternIndex = puzzle.rowDomains[r].patternIndeces[0];
 
         for(int c = 0; c < puzzle.cols; c++) {
-            puzzle.board[r][c] = puzzle.rowPatterns[r][patternIndex][c];
+            int cell = puzzle.rowPatterns[r][patternIndex][c] == UNKNOWN ? CROSSED : puzzle.rowPatterns[r][patternIndex][c];
+            puzzle.board[r][c] = cell;
         }
     }
 }
@@ -763,11 +747,13 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
 
     std::cerr << "\nRunning constraint propagation" << std::endl;
 
-    bool propagation = propagateAllConstraints(puzzle, verbose);
+    // bool propagation = propagateAllConstraints(puzzle, verbose);
 
     switch (method) {
         case PROPAGATION_ONLY: {
             std::cerr << "\n[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
+            bool propagation = propagateAllConstraints(puzzle, verbose);
+            
             if(propagation) {
                 std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
                 reconstructBoardFromDomains(puzzle);
@@ -782,6 +768,13 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
 
         case PROPAGATION_WITH_BACKTRACK: {
             std::cerr << "\n[METHOD] PROPAGATION_WITH_BACKTRACK" << std::endl;
+            bool propagation = propagateAllConstraints(puzzle, verbose);
+            if(propagation) {
+                std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
+                reconstructBoardFromDomains(puzzle);
+                return true;
+            }
+            
             BacktrackStats stats;
             bool solved = backtrackingSolve(puzzle, stats);
 
