@@ -34,6 +34,64 @@ struct Puzzle {
     std::vector<Domain> colDomains;
 };
 
+struct ACOConfig {
+    double alpha = 1.0; // pheromone importance
+    double beta = 1.0;  // heuristic importance
+    double evaporationRate = 0.5; // pheromone evaporation rate
+    int numAnts = 10; // number of ants
+    int maxIterations = 100; // maximum iterations
+    double initialPheromone = 1.0; // initial pheromone level
+    double q0 = 0.9; // probability of exploitation vs exploration
+};
+
+struct Ant {
+    std::vector<int> selectedPatterns;
+    double fitness = 0.0;
+
+    explicit Ant(int rows) {
+        selectedPatterns.assign(rows, -1); // -1 indicates unassigned
+    }
+};
+
+struct PheromoneMatrix {
+    std::vector<std::vector<double>> values;
+
+    void initialize(const Puzzle& puzzle, double initialValue) {
+        values.resize(puzzle.rows);
+
+        for(int r = 0; r < puzzle.rows; r++) {
+            values[r].assign(
+                puzzle.rowPatterns[r].size(),
+                initialValue
+            );
+        }
+    }
+};
+
+
+void testACOInitialization(const Puzzle& puzzle) {
+    std::cerr << "==== Testing ACO Initialization ====" << std::endl;
+
+    ACOConfig config;
+    PheromoneMatrix pheromones;
+    pheromones.initialize(puzzle, config.initialPheromone);
+
+    Ant ant(puzzle.rows);
+
+    std::cerr << "Ants: " << config.numAnts << "\n";
+    std::cerr << "Iterations: " << config.maxIterations << "\n";
+
+    for(int r = 0; r < puzzle.rows; r++) {
+        std::cerr << "Row " << r << ": "
+                << pheromones.values[r].size()
+                << " pheromone entries, "
+                << puzzle.rowDomains[r].patternIndeces.size()
+                << " surviving patterns\n";
+    }
+
+    std::cerr << "Ant assignments: " << ant.selectedPatterns.size() << " rows\n";
+}
+
 uint32_t patternToMask(const std::vector<int>& pattern) {
     uint32_t mask = 0;
     for(int i = 0; i < pattern.size() && i < 32; i++) {
@@ -610,7 +668,6 @@ bool backtrackingSolve(Puzzle& puzzle, BacktrackStats& stats) {
     return solved;
 }
 
-
 void generateAllPatterns(Puzzle& puzzle) {
     // --- ROWS ---
     puzzle.rowPatterns.resize(puzzle.rows);
@@ -754,6 +811,7 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
             std::cerr << "\n[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
             bool propagation = propagateAllConstraints(puzzle, verbose);
             
+            testACOInitialization(puzzle);
             if(propagation) {
                 std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
                 reconstructBoardFromDomains(puzzle);
@@ -793,8 +851,9 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
         case PROPAGATION_WITH_ACO_SA:
             std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO_SA not yet implemented." << std::endl;
             return false;
-            
-        return false;
+        default:
+            std::cerr << "Unknown method." << std::endl;
+            return false;
     }
 
     return true;
