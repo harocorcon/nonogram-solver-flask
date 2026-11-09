@@ -4,6 +4,10 @@
 #include <string>
 #include <cstdint>
 #include <chrono>
+#include <random>
+#include <cmath>
+#include <algorithm>
+#include <stdexcept>
 
 const int UNKNOWN = 0;
 const int FILLED = 1;
@@ -41,7 +45,7 @@ struct ACOConfig {
     int numAnts = 10; // number of ants
     int maxIterations = 100; // maximum iterations
     double initialPheromone = 1.0; // initial pheromone level
-    double q0 = 0.9; // probability of exploitation vs exploration
+    double q0 = 0.0; // probability of exploitation vs exploration
 };
 
 struct Ant {
@@ -91,6 +95,179 @@ void testACOInitialization(const Puzzle& puzzle) {
 
     std::cerr << "Ant assignments: " << ant.selectedPatterns.size() << " rows\n";
 }
+
+double calculateHeuristic(
+    const Puzzle& puzzle,
+    int row,
+    int patternIndex
+) {
+    double totalCompatibility = 0.0;
+
+    uint32_t rowMask =
+        puzzle.rowPatternMasks[row][patternIndex];
+
+    for (int c = 0; c < puzzle.cols; c++) {
+        const auto& colDomain =
+            puzzle.colDomains[c].patternIndeces;
+
+        if (colDomain.empty()) {
+            return 0.0;
+        }
+
+        bool rowFilled = (rowMask >> c) & 1u;
+
+        int compatible = 0;
+
+        for (int colPatternIndex : colDomain) {
+            uint32_t colMask =
+                puzzle.colPatternMasks[c][colPatternIndex];
+
+            bool colFilled = (colMask >> row) & 1u;
+
+            if (rowFilled == colFilled) {
+                compatible++;
+            }
+        }
+
+        totalCompatibility +=
+            static_cast<double>(compatible) /
+            colDomain.size();
+    }
+
+    return totalCompatibility / puzzle.cols;
+}
+
+
+int selectPatternACS(
+    const Puzzle& puzzle,
+    const PheromoneMatrix& pheromones,
+    const ACOConfig& config,
+    int row,
+    std::mt19937& rng
+) {
+    const auto& domain =
+        puzzle.rowDomains[row].patternIndeces;
+
+    if (domain.empty()) {
+        return -1;
+    }
+
+    std::vector<double> weights;
+    double totalWeight = 0.0;
+
+    int bestPattern = domain[0];
+    double bestWeight = -1.0;
+
+    for (int patternIndex : domain) {
+        double tau =
+            pheromones.values[row][patternIndex];
+
+        double eta =
+            calculateHeuristic(puzzle, row, patternIndex);
+
+        double weight =
+            std::pow(tau, config.alpha) *
+            std::pow(eta, config.beta);
+
+        weights.push_back(weight);
+        totalWeight += weight;
+
+        if (weight > bestWeight) {
+            bestWeight = weight;
+            bestPattern = patternIndex;
+        }
+    }
+
+    if (totalWeight <= 0.0) {
+        std::uniform_int_distribution<int> randomIndex(
+            0, static_cast<int>(domain.size()) - 1
+        );
+        return domain[randomIndex(rng)];
+    }
+
+    std::uniform_real_distribution<double> random01(0.0, 1.0);
+
+    // ACS exploitation
+    if (random01(rng) <= config.q0) {
+        return bestPattern;
+    }
+
+    // ACS exploration (roulette-wheel selection)
+    std::discrete_distribution<int> distribution(
+        weights.begin(),
+        weights.end()
+    );
+
+    return domain[distribution(rng)];
+}
+
+
+void constructAntSolution(
+    const Puzzle& puzzle,
+    const PheromoneMatrix& pheromones,
+    const ACOConfig& config,
+    Ant& ant,
+    std::mt19937& rng
+) {
+    std::fill(
+        ant.selectedPatterns.begin(),
+        ant.selectedPatterns.end(),
+        -1
+    );
+
+    ant.fitness = 0.0;
+
+    for (int r = 0; r < puzzle.rows; r++) {
+        int selectedPattern = selectPatternACS(
+            puzzle,
+            pheromones,
+            config,
+            r,
+            rng
+        );
+
+        if (selectedPattern == -1) {
+            return;
+        }
+
+        ant.selectedPatterns[r] = selectedPattern;
+    }
+}
+
+
+void testACOConstruction(const Puzzle& puzzle) {
+    ACOConfig config;
+
+    PheromoneMatrix pheromones;
+    pheromones.initialize(
+        puzzle,
+        config.initialPheromone
+    );
+
+    std::mt19937 rng(42); // Fixed seed for reproducibility
+
+    for (int i = 0; i < 20; i++) {
+        Ant ant(puzzle.rows);
+
+        constructAntSolution(
+            puzzle,
+            pheromones,
+            config,
+            ant,
+            rng
+        );
+
+        std::cerr << "\nAnt " << i << ": ";
+
+        for (int patternIndex : ant.selectedPatterns) {
+            std::cerr << patternIndex << " ";
+        }
+
+        std::cerr << "\n";
+    }
+}
+
+
 
 uint32_t patternToMask(const std::vector<int>& pattern) {
     uint32_t mask = 0;
@@ -692,110 +869,6 @@ void generateAllPatterns(Puzzle& puzzle) {
     }
 }
 
-void testBacktracking2x2(Puzzle& puzzle) {
-    std::cerr << "==== Testing backtracking on 5x5 =====" << std::endl;
-
-    // Puzzle puzzle;
-    // puzzle.rows = 2;
-    // puzzle.cols = 2;
-    // puzzle.rowClues = {{2}, {2}};
-    // puzzle.colClues = {{2}, {2}};
-    // puzzle.board = std::vector<std::vector<int>>(2, std::vector<int>(2, UNKNOWN));
-
-    generateAllPatterns(puzzle);
-    initializeDomains(puzzle);
-
-    BacktrackStats stats;
-    bool solved = backtrackingSolve(puzzle, stats);
-
-    std::cerr << "Solved: " << (solved ? "YES" : "NO") << std::endl;
-    std::cerr << "Nodes visited: " << stats.nodesVisited << std::endl;
-    std::cerr << "Consistency checks: " << stats.consistencyChecks << std::endl;
-    std::cerr << "Backtracks: " << stats.backtracks << std::endl;
-
-    if(solved) printBoard(puzzle);
-    
-}
-
- void testConsistency() {
-    std::cerr << "====Testing consistency check=====" << std::endl;
-
-    // minimal 2x2 puzzle setup
-    // row 0 clues {1}, row 1 clues {1}
-    // col 0 clues{1}, col 1 clues {1}
-    Puzzle puzzle;
-    puzzle.rows = 2;
-    puzzle.cols = 2;
-    puzzle.rowClues = {{1}, {1}};
-    puzzle.colClues = {{1}, {1}};
-    puzzle.board = std::vector<std::vector<int>>(2, std::vector<int>(2, UNKNOWN));
-    
-    puzzle.rowPatterns.resize(2);
-    puzzle.rowPatternMasks.resize(2);
-
-    for(int r = 0; r < 2; r++) { 
-        puzzle.rowPatterns[r] = generatePatterns(2, puzzle.rowClues[r]);
-        puzzle.rowPatternMasks[r].clear();
-        for(const auto& p : puzzle.rowPatterns[r])
-            puzzle.rowPatternMasks[r].push_back(patternToMask(p));
-    }
-    puzzle.colPatterns.resize(2);
-    puzzle.colPatternMasks.resize(2);
-    for(int c = 0; c < 2; c++) {
-        puzzle.colPatterns[c] = generatePatterns(2, puzzle.colClues[c]);
-        puzzle.colPatternMasks[c].clear();
-        for(const auto& p : puzzle.colPatterns[c])
-            puzzle.colPatternMasks[c].push_back(patternToMask(p));
-    }
-
-    // print row 0 patterns
-    std::cerr <<" Row 0 patterns: " << std::endl;
-    for(int i = 0; i < puzzle.rowPatterns[0].size(); i++) {
-        std::cerr << " [" << i << "] ";
-        for(int cell : puzzle.rowPatterns[0][i])
-            std::cerr << (cell == FILLED ? "#" : ".");
-        std::cerr << " mask=" << puzzle.rowPatternMasks[0][i] << std::endl;
-    }
-
-    // print column 0 patterns
-    std::cerr << " Col 0 patterns: " << std::endl;
-    for(int i = 0; i < puzzle.colPatterns[0].size(); i++) {
-        std::cerr << " [" << i << "] ";
-        for(int cell : puzzle.colPatterns[0][i])
-            std::cerr << (cell == FILLED? "#" : ".");
-        std::cerr << " mask=" << puzzle.colPatternMasks[0][i] << std::endl;
-    }
-
-    Assignment assign(2,2);
-    // assign col 0 pattern index 0 (#. means cell(0,0)=filled)
-
- }
-
- void testVarOrdering() {
-    std::cerr << " ===== Testing var ordering ======" << std::endl;
-
-    auto order5x5 = buildVarOrdering(5, 5);
-    for(const Var& v: order5x5) {
-        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
-    }
-    std::cerr << std::endl;
-
-    auto order7x7 = buildVarOrdering(7, 7);
-    for(const Var& v: order7x7) {
-        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
-    }
-    std::cerr << std::endl;
-
-    // Different sizes
-    auto order3x5 = buildVarOrdering(3, 5);
-    std::cerr << "3x5 ordering: ";
-    for (const Var& v : order3x5) {
-        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
-    }
-    std::cerr << std::endl;
- }
-
-
 bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
     std::cerr << "Generating all patterns..." << std::endl;
     
@@ -811,7 +884,6 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
             std::cerr << "\n[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
             bool propagation = propagateAllConstraints(puzzle, verbose);
             
-            testACOInitialization(puzzle);
             if(propagation) {
                 std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
                 reconstructBoardFromDomains(puzzle);
@@ -844,9 +916,21 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
             return solved;
         }
 
-        case PROPAGATION_WITH_ACO:
-            std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO not yet implemented." << std::endl;
-            return false;
+        case PROPAGATION_WITH_ACO: {
+            std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO" << std::endl;
+            bool propagation = propagateAllConstraints(puzzle, verbose);
+            testACOConstruction(puzzle);
+
+            if(propagation) {
+                std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
+                reconstructBoardFromDomains(puzzle);
+                return true;
+            }
+            else{
+                std::cerr << "\n[STUCK] Propagation could not fully solve." << std::endl;
+            }
+            return propagation;
+        }
 
         case PROPAGATION_WITH_ACO_SA:
             std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO_SA not yet implemented." << std::endl;
@@ -878,9 +962,9 @@ int main(int argc, char* argv[]) {
         method = PROPAGATION_ONLY;
     else if ( methodStr == "pwb")
         method = PROPAGATION_WITH_BACKTRACK;
-    else if (methodStr == "aco") 
+    else if (methodStr == "pwACO") 
         method = PROPAGATION_WITH_ACO;
-    else if (methodStr == "aco_sa")
+    else if (methodStr == "pwACO_SA")
         method = PROPAGATION_WITH_ACO_SA;
     else{
         std::cerr << "Unknown method: " << methodStr << std::endl;
