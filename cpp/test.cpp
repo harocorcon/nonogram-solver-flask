@@ -72,7 +72,6 @@ struct PheromoneMatrix {
     }
 };
 
-
 void testACOInitialization(const Puzzle& puzzle) {
     std::cerr << "==== Testing ACO Initialization ====" << std::endl;
 
@@ -267,7 +266,171 @@ void testACOConstruction(const Puzzle& puzzle) {
     }
 }
 
+std::vector<std::vector<int>> reconstructAntBoard(
+    const Puzzle& puzzle,
+    const Ant& ant
+) {
+    std::vector<std::vector<int>> board(
+        puzzle.rows,
+        std::vector<int>(puzzle.cols, UNKNOWN)
+    );
 
+    for (int r = 0; r < puzzle.rows; r++) {
+        int patternIndex = ant.selectedPatterns[r];
+
+        if (patternIndex == -1) {
+            continue;
+        }
+
+        for (int c = 0; c < puzzle.cols; c++) {
+            // board[r][c] =
+            //     puzzle.rowPatterns[r][patternIndex][c];
+
+            uint32_t mask =
+                puzzle.rowPatternMasks[r][patternIndex];
+            bool filled = (mask >> c) & 1u;
+
+            board[r][c] = filled ? FILLED : CROSSED;
+        }
+    }
+
+    return board;
+}
+
+
+double evaluateAntFitness(
+    const Puzzle& puzzle,
+    const Ant& ant
+) {
+    auto board = reconstructAntBoard(puzzle, ant);
+
+    int satisfiedColumns = 0;
+
+    for (int c = 0; c < puzzle.cols; c++) {
+        uint32_t columnMask = 0;
+
+        for (int r = 0; r < puzzle.rows; r++) {
+            if (board[r][c] == FILLED) {
+                columnMask |= (1u << r);
+            }
+        }
+
+        // Check against every valid pattern for this column
+        const auto& validMasks =
+            puzzle.colPatternMasks[c];
+
+        bool satisfied = std::find(
+            validMasks.begin(),
+            validMasks.end(),
+            columnMask
+        ) != validMasks.end();
+
+        if (satisfied) {
+            satisfiedColumns++;
+        }
+    }
+
+    return static_cast<double>(satisfiedColumns)
+           / puzzle.cols;
+}
+
+bool validateAntSolution(
+    const Puzzle &puzzle,
+    const Ant& ant
+) {
+    for (int r = 0; r < puzzle.rows; r++) {
+        int selected = ant.selectedPatterns[r];
+
+        if (selected < 0 || selected >= puzzle.rowPatterns[r].size()) {
+            return false;
+        }
+    }
+    return evaluateAntFitness(puzzle, ant) == 1.0;
+}
+
+void testACOFitness(const Puzzle& puzzle) {
+    ACOConfig config;
+    config.numAnts = 20;
+    config.q0 = 0.0; // pure exploration for testing
+
+    PheromoneMatrix pheromones;
+    pheromones.initialize(
+        puzzle,
+        config.initialPheromone
+    );
+
+    std::mt19937 rng(42); // Fixed seed for reproducibility
+
+    for (int i = 0; i < config.numAnts; i++) {
+        Ant ant(puzzle.rows);
+
+        constructAntSolution(
+            puzzle,
+            pheromones,
+            config,
+            ant,
+            rng
+        );
+
+       ant.fitness = evaluateAntFitness(puzzle, ant);
+
+        std::cerr << "\nAnt " << i << ": ";
+
+        for (int patternIndex : ant.selectedPatterns) {
+            std::cerr << patternIndex << " ";
+        }
+
+        std::cerr << " | Fitness: " << ant.fitness;
+
+        if (validateAntSolution(puzzle, ant)) {
+            std::cerr << " | Valid solution!";
+
+            auto board = reconstructAntBoard(puzzle, ant);
+
+            for (const auto& row : board) {
+                for (int cell : row) {
+                    std::cerr << (cell == FILLED ? '#' : '.');
+                }
+                std::cerr << '\n';
+            }
+        } else {
+            std::cerr << " | Invalid solution!";
+        }
+    }
+}
+
+void printDomainSummary(const Puzzle& puzzle) {
+    std::cerr << "\n========== CP DOMAIN SUMMARY ==========\n";
+
+    bool anyAmbiguous = false;
+
+    for(int r = 0; r < puzzle.rows; r++) {
+        size_t n = puzzle.rowDomains[r].patternIndeces.size();
+        if(n > 1) {
+            std::cerr << " Row " << r << ": " << n << " patterns remain" << std:: endl;
+            anyAmbiguous = true;
+        } else if( n == 0 ) {
+            std::cerr << " Row " << r << ": EMPTY DOMAIN (contradiction!)" << std::endl;
+            anyAmbiguous = true;
+        }
+    }
+
+    for(int c= 0; c < puzzle.cols; c++) {
+        size_t n = puzzle.colDomains[c].patternIndeces.size();
+
+        if(n > 1) {
+            std::cerr << " Col " << c << ": " << n << " patterns remain" << std::endl;
+            anyAmbiguous = true;
+        } else if( n == 0 ) {
+            std::cerr << " Col " << c << ": empty domain!" << std::endl;
+            anyAmbiguous = true;
+        }
+    }
+
+    std::cerr << "Any ambiguous? "
+              << (anyAmbiguous ? "YES" : "NO")
+              << "\n";
+}
 
 uint32_t patternToMask(const std::vector<int>& pattern) {
     uint32_t mask = 0;
@@ -919,7 +1082,8 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
         case PROPAGATION_WITH_ACO: {
             std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO" << std::endl;
             bool propagation = propagateAllConstraints(puzzle, verbose);
-            testACOConstruction(puzzle);
+            printDomainSummary(puzzle);
+            testACOFitness(puzzle);
 
             if(propagation) {
                 std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
