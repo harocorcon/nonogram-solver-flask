@@ -8,429 +8,8 @@
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>
-
-const int UNKNOWN = 0;
-const int FILLED = 1;
-const int CROSSED = -1;
-
-struct Domain {
-    std::vector<int> patternIndeces; // possible patterns
-    uint32_t andMask; // AND of all patterns
-    uint32_t orMask;  // OR of all patterns
-};
-struct Puzzle {
-    int rows;
-    int cols;
-
-    std::vector<std::vector<int>> rowClues;
-    std::vector<std::vector<int>> colClues;
-    std::vector<std::vector<int>> board;
-
-    std::vector<std::vector<std::vector<int>>> rowPatterns;  // [row][patternIndex][cell]   
-    std::vector<std::vector<std::vector<int>>> colPatterns;  // [col][patternIndex][cell]   
-
-    std::vector<int> rowPatternCounts;
-    std::vector<int> colPatternCounts;
-
-    std::vector<std::vector<uint32_t>> rowPatternMasks;
-    std::vector<std::vector<uint32_t>> colPatternMasks;
-    std::vector<Domain> rowDomains; 
-    std::vector<Domain> colDomains;
-};
-
-struct ACOConfig {
-    double alpha = 1.0; // pheromone importance
-    double beta = 1.0;  // heuristic importance
-    double evaporationRate = 0.5; // pheromone evaporation rate
-    int numAnts = 10; // number of ants
-    int maxIterations = 100; // maximum iterations
-    double initialPheromone = 1.0; // initial pheromone level
-    double q0 = 0.0; // probability of exploitation vs exploration
-};
-
-struct Ant {
-    std::vector<int> selectedPatterns;
-    double fitness = 0.0;
-
-    explicit Ant(int rows) {
-        selectedPatterns.assign(rows, -1); // -1 indicates unassigned
-    }
-};
-
-struct PheromoneMatrix {
-    std::vector<std::vector<double>> values;
-
-    void initialize(const Puzzle& puzzle, double initialValue) {
-        values.resize(puzzle.rows);
-
-        for(int r = 0; r < puzzle.rows; r++) {
-            values[r].assign(
-                puzzle.rowPatterns[r].size(),
-                initialValue
-            );
-        }
-    }
-};
-
-void testACOInitialization(const Puzzle& puzzle) {
-    std::cerr << "==== Testing ACO Initialization ====" << std::endl;
-
-    ACOConfig config;
-    PheromoneMatrix pheromones;
-    pheromones.initialize(puzzle, config.initialPheromone);
-
-    Ant ant(puzzle.rows);
-
-    std::cerr << "Ants: " << config.numAnts << "\n";
-    std::cerr << "Iterations: " << config.maxIterations << "\n";
-
-    for(int r = 0; r < puzzle.rows; r++) {
-        std::cerr << "Row " << r << ": "
-                << pheromones.values[r].size()
-                << " pheromone entries, "
-                << puzzle.rowDomains[r].patternIndeces.size()
-                << " surviving patterns\n";
-    }
-
-    std::cerr << "Ant assignments: " << ant.selectedPatterns.size() << " rows\n";
-}
-
-double calculateHeuristic(
-    const Puzzle& puzzle,
-    int row,
-    int patternIndex
-) {
-    double totalCompatibility = 0.0;
-
-    uint32_t rowMask =
-        puzzle.rowPatternMasks[row][patternIndex];
-
-    for (int c = 0; c < puzzle.cols; c++) {
-        const auto& colDomain =
-            puzzle.colDomains[c].patternIndeces;
-
-        if (colDomain.empty()) {
-            return 0.0;
-        }
-
-        bool rowFilled = (rowMask >> c) & 1u;
-
-        int compatible = 0;
-
-        for (int colPatternIndex : colDomain) {
-            uint32_t colMask =
-                puzzle.colPatternMasks[c][colPatternIndex];
-
-            bool colFilled = (colMask >> row) & 1u;
-
-            if (rowFilled == colFilled) {
-                compatible++;
-            }
-        }
-
-        totalCompatibility +=
-            static_cast<double>(compatible) /
-            colDomain.size();
-    }
-
-    return totalCompatibility / puzzle.cols;
-}
-
-
-int selectPatternACS(
-    const Puzzle& puzzle,
-    const PheromoneMatrix& pheromones,
-    const ACOConfig& config,
-    int row,
-    std::mt19937& rng
-) {
-    const auto& domain =
-        puzzle.rowDomains[row].patternIndeces;
-
-    if (domain.empty()) {
-        return -1;
-    }
-
-    std::vector<double> weights;
-    double totalWeight = 0.0;
-
-    int bestPattern = domain[0];
-    double bestWeight = -1.0;
-
-    for (int patternIndex : domain) {
-        double tau =
-            pheromones.values[row][patternIndex];
-
-        double eta =
-            calculateHeuristic(puzzle, row, patternIndex);
-
-        double weight =
-            std::pow(tau, config.alpha) *
-            std::pow(eta, config.beta);
-
-        weights.push_back(weight);
-        totalWeight += weight;
-
-        if (weight > bestWeight) {
-            bestWeight = weight;
-            bestPattern = patternIndex;
-        }
-    }
-
-    if (totalWeight <= 0.0) {
-        std::uniform_int_distribution<int> randomIndex(
-            0, static_cast<int>(domain.size()) - 1
-        );
-        return domain[randomIndex(rng)];
-    }
-
-    std::uniform_real_distribution<double> random01(0.0, 1.0);
-
-    // ACS exploitation
-    if (random01(rng) <= config.q0) {
-        return bestPattern;
-    }
-
-    // ACS exploration (roulette-wheel selection)
-    std::discrete_distribution<int> distribution(
-        weights.begin(),
-        weights.end()
-    );
-
-    return domain[distribution(rng)];
-}
-
-
-void constructAntSolution(
-    const Puzzle& puzzle,
-    const PheromoneMatrix& pheromones,
-    const ACOConfig& config,
-    Ant& ant,
-    std::mt19937& rng
-) {
-    std::fill(
-        ant.selectedPatterns.begin(),
-        ant.selectedPatterns.end(),
-        -1
-    );
-
-    ant.fitness = 0.0;
-
-    for (int r = 0; r < puzzle.rows; r++) {
-        int selectedPattern = selectPatternACS(
-            puzzle,
-            pheromones,
-            config,
-            r,
-            rng
-        );
-
-        if (selectedPattern == -1) {
-            return;
-        }
-
-        ant.selectedPatterns[r] = selectedPattern;
-    }
-}
-
-
-void testACOConstruction(const Puzzle& puzzle) {
-    ACOConfig config;
-
-    PheromoneMatrix pheromones;
-    pheromones.initialize(
-        puzzle,
-        config.initialPheromone
-    );
-
-    std::mt19937 rng(42); // Fixed seed for reproducibility
-
-    for (int i = 0; i < 20; i++) {
-        Ant ant(puzzle.rows);
-
-        constructAntSolution(
-            puzzle,
-            pheromones,
-            config,
-            ant,
-            rng
-        );
-
-        std::cerr << "\nAnt " << i << ": ";
-
-        for (int patternIndex : ant.selectedPatterns) {
-            std::cerr << patternIndex << " ";
-        }
-
-        std::cerr << "\n";
-    }
-}
-
-std::vector<std::vector<int>> reconstructAntBoard(
-    const Puzzle& puzzle,
-    const Ant& ant
-) {
-    std::vector<std::vector<int>> board(
-        puzzle.rows,
-        std::vector<int>(puzzle.cols, UNKNOWN)
-    );
-
-    for (int r = 0; r < puzzle.rows; r++) {
-        int patternIndex = ant.selectedPatterns[r];
-
-        if (patternIndex == -1) {
-            continue;
-        }
-
-        for (int c = 0; c < puzzle.cols; c++) {
-            // board[r][c] =
-            //     puzzle.rowPatterns[r][patternIndex][c];
-
-            uint32_t mask =
-                puzzle.rowPatternMasks[r][patternIndex];
-            bool filled = (mask >> c) & 1u;
-
-            board[r][c] = filled ? FILLED : CROSSED;
-        }
-    }
-
-    return board;
-}
-
-
-double evaluateAntFitness(
-    const Puzzle& puzzle,
-    const Ant& ant
-) {
-    auto board = reconstructAntBoard(puzzle, ant);
-
-    int satisfiedColumns = 0;
-
-    for (int c = 0; c < puzzle.cols; c++) {
-        uint32_t columnMask = 0;
-
-        for (int r = 0; r < puzzle.rows; r++) {
-            if (board[r][c] == FILLED) {
-                columnMask |= (1u << r);
-            }
-        }
-
-        // Check against every valid pattern for this column
-        const auto& validMasks =
-            puzzle.colPatternMasks[c];
-
-        bool satisfied = std::find(
-            validMasks.begin(),
-            validMasks.end(),
-            columnMask
-        ) != validMasks.end();
-
-        if (satisfied) {
-            satisfiedColumns++;
-        }
-    }
-
-    return static_cast<double>(satisfiedColumns)
-           / puzzle.cols;
-}
-
-bool validateAntSolution(
-    const Puzzle &puzzle,
-    const Ant& ant
-) {
-    for (int r = 0; r < puzzle.rows; r++) {
-        int selected = ant.selectedPatterns[r];
-
-        if (selected < 0 || selected >= puzzle.rowPatterns[r].size()) {
-            return false;
-        }
-    }
-    return evaluateAntFitness(puzzle, ant) == 1.0;
-}
-
-void testACOFitness(const Puzzle& puzzle) {
-    ACOConfig config;
-    config.numAnts = 20;
-    config.q0 = 0.0; // pure exploration for testing
-
-    PheromoneMatrix pheromones;
-    pheromones.initialize(
-        puzzle,
-        config.initialPheromone
-    );
-
-    std::mt19937 rng(42); // Fixed seed for reproducibility
-
-    for (int i = 0; i < config.numAnts; i++) {
-        Ant ant(puzzle.rows);
-
-        constructAntSolution(
-            puzzle,
-            pheromones,
-            config,
-            ant,
-            rng
-        );
-
-       ant.fitness = evaluateAntFitness(puzzle, ant);
-
-        std::cerr << "\nAnt " << i << ": ";
-
-        for (int patternIndex : ant.selectedPatterns) {
-            std::cerr << patternIndex << " ";
-        }
-
-        std::cerr << " | Fitness: " << ant.fitness;
-
-        if (validateAntSolution(puzzle, ant)) {
-            std::cerr << " | Valid solution!";
-
-            auto board = reconstructAntBoard(puzzle, ant);
-
-            for (const auto& row : board) {
-                for (int cell : row) {
-                    std::cerr << (cell == FILLED ? '#' : '.');
-                }
-                std::cerr << '\n';
-            }
-        } else {
-            std::cerr << " | Invalid solution!";
-        }
-    }
-}
-
-void printDomainSummary(const Puzzle& puzzle) {
-    std::cerr << "\n========== CP DOMAIN SUMMARY ==========\n";
-
-    bool anyAmbiguous = false;
-
-    for(int r = 0; r < puzzle.rows; r++) {
-        size_t n = puzzle.rowDomains[r].patternIndeces.size();
-        if(n > 1) {
-            std::cerr << " Row " << r << ": " << n << " patterns remain" << std:: endl;
-            anyAmbiguous = true;
-        } else if( n == 0 ) {
-            std::cerr << " Row " << r << ": EMPTY DOMAIN (contradiction!)" << std::endl;
-            anyAmbiguous = true;
-        }
-    }
-
-    for(int c= 0; c < puzzle.cols; c++) {
-        size_t n = puzzle.colDomains[c].patternIndeces.size();
-
-        if(n > 1) {
-            std::cerr << " Col " << c << ": " << n << " patterns remain" << std::endl;
-            anyAmbiguous = true;
-        } else if( n == 0 ) {
-            std::cerr << " Col " << c << ": empty domain!" << std::endl;
-            anyAmbiguous = true;
-        }
-    }
-
-    std::cerr << "Any ambiguous? "
-              << (anyAmbiguous ? "YES" : "NO")
-              << "\n";
-}
+#include "puzzle.h"
+#include "aco.h"
 
 uint32_t patternToMask(const std::vector<int>& pattern) {
     uint32_t mask = 0;
@@ -643,8 +222,6 @@ void initializeDomains(Puzzle& puzzle) {
 // "These two tuples are used to filter the domains of intersecting
 // row/column variables"
 void filterRowPatterns(Puzzle& puzzle, int row) {
-    // std::cerr << "Filtering row patterns for row " << row << "domain size = " << puzzle.rowDomains[row].patternIndeces.size() << " -- " << std::endl;
-    
     std::vector<int> newDomain;
 
     for (int patternIndex : puzzle.rowDomains[row].patternIndeces) {
@@ -678,14 +255,12 @@ void filterRowPatterns(Puzzle& puzzle, int row) {
         std::cerr << "\npattern " << patternIndex << "[";
         for(int c = 0; c < puzzle.cols; c++)
             std::cerr << ((rowMask >> c) & 1);
-        // std::cerr << "] -> " << (valid ? "KEEP" : "REJECT");
         if(!valid)
             std::cerr << "(col " << rejectCol << ": " << reason << ")";
         
         if (valid) newDomain.push_back(patternIndex);
     }
     puzzle.rowDomains[row].patternIndeces = newDomain;
-    // std::cerr << " -> new domain size: " << newDomain.size() << std::endl;
 }
 
 void filterColPatterns(Puzzle& puzzle, int col) {
@@ -1082,9 +657,7 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
         case PROPAGATION_WITH_ACO: {
             std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO" << std::endl;
             bool propagation = propagateAllConstraints(puzzle, verbose);
-            printDomainSummary(puzzle);
-            testACOFitness(puzzle);
-
+            
             if(propagation) {
                 std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
                 reconstructBoardFromDomains(puzzle);
@@ -1093,7 +666,16 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
             else{
                 std::cerr << "\n[STUCK] Propagation could not fully solve." << std::endl;
             }
-            return propagation;
+
+            auto solvedBoard = testACS(puzzle);
+
+            if(!solvedBoard.empty()) {
+                puzzle.board = solvedBoard;
+                std::cerr << "ACS solution stored in puzzle.board \n";
+            } else {
+                std::cerr << "ACS failed to find a solution.\n";
+            }
+            return !solvedBoard.empty();
         }
 
         case PROPAGATION_WITH_ACO_SA:
