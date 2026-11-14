@@ -65,7 +65,7 @@ def solve():
 
     result = subprocess.run(
         [
-            "cpp/test.exe", 
+            "nonogram.exe", 
             "solve",
             solver,
             str(len(board)), # row size
