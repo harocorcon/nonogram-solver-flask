@@ -76,37 +76,56 @@
             </div>
         </div>
 
-        <div class="button-group">
+       
+
+        <div class="algorithm-selector">
+            <h3>Select Solving Algorithm</h3>
+
+            <label class="radio-option">
+                <input type="radio" name="algorithm" value="cp">
+                <span>Constraint Propagation</span>
+            </label>
+
+            <label class="radio-option">
+                <input type="radio" name="algorithm" value="cp-bt">
+                <span>Propagation + Backtracking</span>
+            </label>
+
+            <label class="radio-option">
+                <input type="radio" name="algorithm" value="cp-aco" checked>
+                <span>Propagation + ACO</span>
+            </label>
+
+            <label class="radio-option">
+                <input type="radio" name="algorithm" value="aco">
+                <span>Ant Colony Optimization</span>
+            </label>
+
+            <label class="radio-option">
+                <input disabled type="radio" name="algorithm" value="sa">
+                <span>Simulated Annealing</span>
+            </label>
+
+            <label class="radio-option">
+                <input disabled type="radio" name="algorithm" value="cp-sa">
+                <span>CP + ACO + SA</span>
+            </label>
+        </div>
+    </div>
+
+     <div class="button-group">
             <div>
                 <button class="button" id="clear-button">Clear Board</button>
             </div>
 
             <div>
-                <button class="button solver-button" 
-                        id="solve-prop" 
-                        data-solver="propagation-only"
+                <button class="button" 
+                        id="solve-btn"
                 >
-                        Propagation Only
+                        Solve Puzzle
                 </button>
             </div>
-
-            <div>
-                <button class="button solver-button" 
-                        id="solve-pwb"
-                        data-solver="pwb"
-                >
-                        Propagation + Backtracking</button>
-            </div>
-
-            <div>
-                <button class="button solver-button" 
-                        id="solve-pwACO"
-                        data-solver="pwACO"
-                >
-                        Propagation + ACO</button>
-            </div>
         </div>
-    </div>
 
     <script >
         const cells = document.querySelectorAll('.cell');
@@ -143,7 +162,7 @@
         });
 
         const clearButton = document.getElementById("clear-button");
-        const solverButtons = document.querySelectorAll(".solver-button");
+        // const solverButtons = document.querySelectorAll(".solver-button");
 
         clearButton.addEventListener("click", () => {
             fetch("/clear")
@@ -152,17 +171,17 @@
                 updateBoard(data.board);
             })
         })
+        
+        document.getElementById("solve-btn").addEventListener("click", () => {
+            const solver = document.querySelector(
+                'input[name="algorithm"]:checked'
+            )?.value;
 
-        solverButtons.forEach(button => {
-            button.addEventListener("click", () => {
-                const solver = button.dataset.solver;
-
-                fetch(`/solve?solver=${solver}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        updateBoard(data.board);
-                    });
-            });
+            fetch(`/solve?solver=${solver}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateBoard(data.board);
+                });
         });
 
         function updateAppearance(cell, state) {
