@@ -4,35 +4,12 @@
 #include <string>
 #include <cstdint>
 #include <chrono>
-
-const int UNKNOWN = 0;
-const int FILLED = 1;
-const int CROSSED = -1;
-
-struct Domain {
-    std::vector<int> patternIndeces; // possible patterns
-    uint32_t andMask; // AND of all patterns
-    uint32_t orMask;  // OR of all patterns
-};
-struct Puzzle {
-    int rows;
-    int cols;
-
-    std::vector<std::vector<int>> rowClues;
-    std::vector<std::vector<int>> colClues;
-    std::vector<std::vector<int>> board;
-
-    std::vector<std::vector<std::vector<int>>> rowPatterns;  // [row][patternIndex][cell]   
-    std::vector<std::vector<std::vector<int>>> colPatterns;  // [col][patternIndex][cell]   
-
-    std::vector<int> rowPatternCounts;
-    std::vector<int> colPatternCounts;
-
-    std::vector<std::vector<uint32_t>> rowPatternMasks;
-    std::vector<std::vector<uint32_t>> colPatternMasks;
-    std::vector<Domain> rowDomains; 
-    std::vector<Domain> colDomains;
-};
+#include <random>
+#include <cmath>
+#include <algorithm>
+#include <stdexcept>
+#include "puzzle.h"
+#include "aco.h"
 
 uint32_t patternToMask(const std::vector<int>& pattern) {
     uint32_t mask = 0;
@@ -137,30 +114,6 @@ std::vector<std::vector<int>> generatePatterns(
     return patterns;
 }
 
-
-
-void xsolvePuzzle(Puzzle& puzzle) {
-    for (int r = 0; r < puzzle.rows; r++)
-    {
-        for (int c = 0; c < puzzle.cols; c++)
-        {
-            puzzle.board[r][c] = FILLED;
-        }
-    }
-
-    std::vector<int> clues = {2, 1};
-
-    std::vector<std::vector<int>> patterns = generatePatterns(5, clues);
-
-    for(const auto& pattern : patterns) {
-        for (int cell : pattern) {
-            std::cerr << cell << "-";
-        }
-        std::cerr << "\n";
-    }
-
-}
-
 void printBoard(const Puzzle& puzzle)
 {
     for(const auto& row : puzzle.board)
@@ -226,6 +179,13 @@ Puzzle readPuzzle(int rows, int cols) {
     return puzzle;
 }
 
+
+//  Copilot
+// The initializeDomains function initializes the row and column domains of a Puzzle
+// object by resizing the rowDomains and colDomains vectors, setting up possible pattern
+// indices, and computing the AND and OR masks for each row and column based on 
+// their respective pattern masks. This setup is essential for managing the 
+// constraints and possibilities within the puzzle's structure.
 void initializeDomains(Puzzle& puzzle) { 
     puzzle.rowDomains.resize(puzzle.rows);
     puzzle.colDomains.resize(puzzle.cols);
@@ -262,8 +222,6 @@ void initializeDomains(Puzzle& puzzle) {
 // "These two tuples are used to filter the domains of intersecting
 // row/column variables"
 void filterRowPatterns(Puzzle& puzzle, int row) {
-    // std::cerr << "Filtering row patterns for row " << row << "domain size = " << puzzle.rowDomains[row].patternIndeces.size() << " -- " << std::endl;
-    
     std::vector<int> newDomain;
 
     for (int patternIndex : puzzle.rowDomains[row].patternIndeces) {
@@ -297,14 +255,12 @@ void filterRowPatterns(Puzzle& puzzle, int row) {
         std::cerr << "\npattern " << patternIndex << "[";
         for(int c = 0; c < puzzle.cols; c++)
             std::cerr << ((rowMask >> c) & 1);
-        // std::cerr << "] -> " << (valid ? "KEEP" : "REJECT");
         if(!valid)
             std::cerr << "(col " << rejectCol << ": " << reason << ")";
         
         if (valid) newDomain.push_back(patternIndex);
     }
     puzzle.rowDomains[row].patternIndeces = newDomain;
-    // std::cerr << " -> new domain size: " << newDomain.size() << std::endl;
 }
 
 void filterColPatterns(Puzzle& puzzle, int col) {
@@ -363,7 +319,7 @@ void recomputeColumnMasks(Puzzle& puzzle, int col) {
 // Section 3.4
 // This iterative process significantly narrows down the domains of the variables and continues until no further reduction can be made.
 
-// returns true of the puzzle became fully solved (all domains =  1 pattern)
+// returns true if the puzzle became fully solved (all domains =  1 pattern)
 bool propagateAllConstraints(Puzzle& puzzle, bool verbose = false) {
     bool changed = true;
     int iteration = 0;
@@ -426,7 +382,8 @@ void reconstructBoardFromDomains(Puzzle& puzzle) {
         int patternIndex = puzzle.rowDomains[r].patternIndeces[0];
 
         for(int c = 0; c < puzzle.cols; c++) {
-            puzzle.board[r][c] = puzzle.rowPatterns[r][patternIndex][c];
+            int cell = puzzle.rowPatterns[r][patternIndex][c] == UNKNOWN ? CROSSED : puzzle.rowPatterns[r][patternIndex][c];
+            puzzle.board[r][c] = cell;
         }
     }
 }
@@ -467,7 +424,8 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
     PROPAGATION_ONLY,
     PROPAGATION_WITH_BACKTRACK,
     PROPAGATION_WITH_ACO,
-    PROPAGATION_WITH_ACO_SA
+    PROPAGATION_WITH_ACO_SA,
+    ACO_ONLY
  };
 
  // From paper Section 3.4: 
@@ -618,14 +576,13 @@ bool backtrackingSolve(Puzzle& puzzle, BacktrackStats& stats) {
         for(int r = 0; r < puzzle.rows; r++) {
             int pIndex = assign.rowPattern[r];
             for(int c = 0; c < puzzle.cols; c++) {
-                puzzle.board[r][c] = puzzle.rowPatterns[r][pIndex][c];
+                puzzle.board[r][c] = puzzle.rowPatterns[r][pIndex][c] == UNKNOWN? CROSSED : puzzle.rowPatterns[r][pIndex][c];
             }
         }
     }
 
     return solved;
 }
-
 
 void generateAllPatterns(Puzzle& puzzle) {
     // --- ROWS ---
@@ -651,123 +608,17 @@ void generateAllPatterns(Puzzle& puzzle) {
     }
 }
 
-void testBacktracking2x2(Puzzle& puzzle) {
-    std::cerr << "==== Testing backtracking on 5x5 =====" << std::endl;
-
-    // Puzzle puzzle;
-    // puzzle.rows = 2;
-    // puzzle.cols = 2;
-    // puzzle.rowClues = {{2}, {2}};
-    // puzzle.colClues = {{2}, {2}};
-    // puzzle.board = std::vector<std::vector<int>>(2, std::vector<int>(2, UNKNOWN));
-
-    generateAllPatterns(puzzle);
-    initializeDomains(puzzle);
-
-    BacktrackStats stats;
-    bool solved = backtrackingSolve(puzzle, stats);
-
-    std::cerr << "Solved: " << (solved ? "YES" : "NO") << std::endl;
-    std::cerr << "Nodes visited: " << stats.nodesVisited << std::endl;
-    std::cerr << "Consistency checks: " << stats.consistencyChecks << std::endl;
-    std::cerr << "Backtracks: " << stats.backtracks << std::endl;
-
-    if(solved) printBoard(puzzle);
-    
-}
-
- void testConsistency() {
-    std::cerr << "====Testing consistency check=====" << std::endl;
-
-    // minimal 2x2 puzzle setup
-    // row 0 clues {1}, row 1 clues {1}
-    // col 0 clues{1}, col 1 clues {1}
-    Puzzle puzzle;
-    puzzle.rows = 2;
-    puzzle.cols = 2;
-    puzzle.rowClues = {{1}, {1}};
-    puzzle.colClues = {{1}, {1}};
-    puzzle.board = std::vector<std::vector<int>>(2, std::vector<int>(2, UNKNOWN));
-    
-    puzzle.rowPatterns.resize(2);
-    puzzle.rowPatternMasks.resize(2);
-
-    for(int r = 0; r < 2; r++) { 
-        puzzle.rowPatterns[r] = generatePatterns(2, puzzle.rowClues[r]);
-        puzzle.rowPatternMasks[r].clear();
-        for(const auto& p : puzzle.rowPatterns[r])
-            puzzle.rowPatternMasks[r].push_back(patternToMask(p));
-    }
-    puzzle.colPatterns.resize(2);
-    puzzle.colPatternMasks.resize(2);
-    for(int c = 0; c < 2; c++) {
-        puzzle.colPatterns[c] = generatePatterns(2, puzzle.colClues[c]);
-        puzzle.colPatternMasks[c].clear();
-        for(const auto& p : puzzle.colPatterns[c])
-            puzzle.colPatternMasks[c].push_back(patternToMask(p));
-    }
-
-    // print row 0 patterns
-    std::cerr <<" Row 0 patterns: " << std::endl;
-    for(int i = 0; i < puzzle.rowPatterns[0].size(); i++) {
-        std::cerr << " [" << i << "] ";
-        for(int cell : puzzle.rowPatterns[0][i])
-            std::cerr << (cell == FILLED ? "#" : ".");
-        std::cerr << " mask=" << puzzle.rowPatternMasks[0][i] << std::endl;
-    }
-
-    // print column 0 patterns
-    std::cerr << " Col 0 patterns: " << std::endl;
-    for(int i = 0; i < puzzle.colPatterns[0].size(); i++) {
-        std::cerr << " [" << i << "] ";
-        for(int cell : puzzle.colPatterns[0][i])
-            std::cerr << (cell == FILLED? "#" : ".");
-        std::cerr << " mask=" << puzzle.colPatternMasks[0][i] << std::endl;
-    }
-
-    Assignment assign(2,2);
-    // assign col 0 pattern index 0 (#. means cell(0,0)=filled)
-
- }
-
- void testVarOrdering() {
-    std::cerr << " ===== Testing var ordering ======" << std::endl;
-
-    auto order5x5 = buildVarOrdering(5, 5);
-    for(const Var& v: order5x5) {
-        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
-    }
-    std::cerr << std::endl;
-
-    auto order7x7 = buildVarOrdering(7, 7);
-    for(const Var& v: order7x7) {
-        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
-    }
-    std::cerr << std::endl;
-
-    // Different sizes
-    auto order3x5 = buildVarOrdering(3, 5);
-    std::cerr << "3x5 ordering: ";
-    for (const Var& v : order3x5) {
-        std::cerr << (v.kind == VAR_ROW ? "R" : "C") << v.index << " ";
-    }
-    std::cerr << std::endl;
- }
-
-
 bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
     std::cerr << "Generating all patterns..." << std::endl;
     
     generateAllPatterns(puzzle);
     initializeDomains(puzzle);
-
-    std::cerr << "\nRunning constraint propagation" << std::endl;
-
-    bool propagation = propagateAllConstraints(puzzle, verbose);
-
+    
     switch (method) {
         case PROPAGATION_ONLY: {
             std::cerr << "\n[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
+            bool propagation = propagateAllConstraints(puzzle, verbose);
+            
             if(propagation) {
                 std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
                 reconstructBoardFromDomains(puzzle);
@@ -782,6 +633,13 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
 
         case PROPAGATION_WITH_BACKTRACK: {
             std::cerr << "\n[METHOD] PROPAGATION_WITH_BACKTRACK" << std::endl;
+            bool propagation = propagateAllConstraints(puzzle, verbose);
+            if(propagation) {
+                std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
+                reconstructBoardFromDomains(puzzle);
+                return true;
+            }
+            
             BacktrackStats stats;
             bool solved = backtrackingSolve(puzzle, stats);
 
@@ -793,15 +651,49 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
             return solved;
         }
 
-        case PROPAGATION_WITH_ACO:
-            std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO not yet implemented." << std::endl;
-            return false;
+        case PROPAGATION_WITH_ACO: {
+            std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO" << std::endl;
+            bool propagation = propagateAllConstraints(puzzle, verbose);
+            
+            if(propagation) {
+                std::cerr << "\n[SUCESS] Solved by propagation alone," << std::endl;
+                reconstructBoardFromDomains(puzzle);
+                return true;
+            }
+            else{
+                std::cerr << "\n[STUCK] Propagation could not fully solve." << std::endl;
+            }
+
+            auto solvedBoard = testACS(puzzle);
+
+            if(!solvedBoard.empty()) {
+                puzzle.board = solvedBoard;
+                std::cerr << "ACS solution stored in puzzle.board \n";
+            } else {
+                std::cerr << "ACS failed to find a solution.\n";
+            }
+            return !solvedBoard.empty();
+        }
+
+        case ACO_ONLY: {
+            std::cerr << "\n[METHOD] ACO_ONLY." << std::endl;
+            auto solvedBoard = testACS(puzzle);
+
+            if(!solvedBoard.empty()) {
+                puzzle.board = solvedBoard;
+                std::cerr << "ACS solution stored in puzzle.board \n";
+            } else {
+                std::cerr << "ACS failed to find a solution.\n";
+            }
+            return !solvedBoard.empty();
+        }
 
         case PROPAGATION_WITH_ACO_SA:
             std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO_SA not yet implemented." << std::endl;
             return false;
-            
-        return false;
+        default:
+            std::cerr << "Unknown method." << std::endl;
+            return false;
     }
 
     return true;
@@ -820,16 +712,18 @@ int main(int argc, char* argv[]) {
     int cols = std::stoi(argv[4]);
 
     auto start = std::chrono::high_resolution_clock::now();
-
+    
     SolveMethod method;
-    if(methodStr == "propagation-only")
+    if(methodStr == "cp")
         method = PROPAGATION_ONLY;
-    else if ( methodStr == "pwb")
+    else if ( methodStr == "cp-bt")
         method = PROPAGATION_WITH_BACKTRACK;
-    else if (methodStr == "aco") 
+    else if (methodStr == "cp-aco") 
         method = PROPAGATION_WITH_ACO;
-    else if (methodStr == "aco_sa")
+    else if (methodStr == "cp-aco-sa")
         method = PROPAGATION_WITH_ACO_SA;
+    else if (methodStr == "aco") 
+        method = ACO_ONLY;
     else{
         std::cerr << "Unknown method: " << methodStr << std::endl;
         return 1; 
