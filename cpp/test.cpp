@@ -424,7 +424,8 @@ void printAmbiguousDomains(const Puzzle& puzzle) {
     PROPAGATION_ONLY,
     PROPAGATION_WITH_BACKTRACK,
     PROPAGATION_WITH_ACO,
-    PROPAGATION_WITH_ACO_SA
+    PROPAGATION_WITH_ACO_SA,
+    ACO_ONLY
  };
 
  // From paper Section 3.4: 
@@ -575,7 +576,7 @@ bool backtrackingSolve(Puzzle& puzzle, BacktrackStats& stats) {
         for(int r = 0; r < puzzle.rows; r++) {
             int pIndex = assign.rowPattern[r];
             for(int c = 0; c < puzzle.cols; c++) {
-                puzzle.board[r][c] = puzzle.rowPatterns[r][pIndex][c];
+                puzzle.board[r][c] = puzzle.rowPatterns[r][pIndex][c] == UNKNOWN? CROSSED : puzzle.rowPatterns[r][pIndex][c];
             }
         }
     }
@@ -612,11 +613,7 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
     
     generateAllPatterns(puzzle);
     initializeDomains(puzzle);
-
-    std::cerr << "\nRunning constraint propagation" << std::endl;
-
-    // bool propagation = propagateAllConstraints(puzzle, verbose);
-
+    
     switch (method) {
         case PROPAGATION_ONLY: {
             std::cerr << "\n[METHOD] PROPAGATION_ONLY -- stopping here." << std::endl;
@@ -678,6 +675,19 @@ bool solvePuzzle(Puzzle& puzzle, SolveMethod method, bool verbose) {
             return !solvedBoard.empty();
         }
 
+        case ACO_ONLY: {
+            std::cerr << "\n[METHOD] ACO_ONLY." << std::endl;
+            auto solvedBoard = testACS(puzzle);
+
+            if(!solvedBoard.empty()) {
+                puzzle.board = solvedBoard;
+                std::cerr << "ACS solution stored in puzzle.board \n";
+            } else {
+                std::cerr << "ACS failed to find a solution.\n";
+            }
+            return !solvedBoard.empty();
+        }
+
         case PROPAGATION_WITH_ACO_SA:
             std::cerr << "\n[METHOD] PROPAGATION_WITH_ACO_SA not yet implemented." << std::endl;
             return false;
@@ -702,16 +712,18 @@ int main(int argc, char* argv[]) {
     int cols = std::stoi(argv[4]);
 
     auto start = std::chrono::high_resolution_clock::now();
-
+    
     SolveMethod method;
-    if(methodStr == "propagation-only")
+    if(methodStr == "cp")
         method = PROPAGATION_ONLY;
-    else if ( methodStr == "pwb")
+    else if ( methodStr == "cp-bt")
         method = PROPAGATION_WITH_BACKTRACK;
-    else if (methodStr == "pwACO") 
+    else if (methodStr == "cp-aco") 
         method = PROPAGATION_WITH_ACO;
-    else if (methodStr == "pwACO_SA")
+    else if (methodStr == "cp-aco-sa")
         method = PROPAGATION_WITH_ACO_SA;
+    else if (methodStr == "aco") 
+        method = ACO_ONLY;
     else{
         std::cerr << "Unknown method: " << methodStr << std::endl;
         return 1; 
